@@ -1,12 +1,27 @@
+# ffigen.yaml
 name: WingetBindings
-description: FFI bindings for winget_nc.dll (flat C ABI).
+description: FFI bindings for winget_nc.dll — auto-generated, do not edit.
 output: lib/src/bindings/winget_bindings.dart
+
 headers:
   entry-points:
     - native/src/winget_bridge.h
+  include-directives:
+    - '**/winget_bridge.h'      # Only parse the bridge header; ignore WinRT includes
+
+# Map C types to Dart
+type-map:
+  'int64_t': 'Int64'
+  'int32_t': 'Int32'
+
 compiler-opts:
   - '-DWINGET_NC_EXPORTS'
   - '-fms-extensions'
+
 functions:
   include:
-    - 'wg_.*'
+    - 'wg_.*'          # Only include wg_ prefixed symbols
+
+# Use @DefaultAsset — resolved by the Build Hook CodeAsset
+native-assets:
+  asset-id: 'package:winget_dart/src/winget_nc.dart'
