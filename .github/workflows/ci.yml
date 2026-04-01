@@ -121,6 +121,16 @@ jobs:
       - run: dart test --tags=integration
         continue-on-error: true
 
+  # Publish dry-run — validates package before release
+  publish-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart pub publish --dry-run
+      - run: dart analyze
+
   # Coverage (unit tests only)
   coverage:
     runs-on: windows-2022

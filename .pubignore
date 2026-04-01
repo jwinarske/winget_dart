@@ -5,13 +5,20 @@ native/test/
 *.pdb
 *.ilk
 *.exp
+*.lib
 
-# Vendored third-party (large, not needed by consumers)
-native/third_party/
+# Vendored third-party binaries (consumers compile from source via build hook)
+native/third_party/winget_interop/lib/
 
 # Dev configs
 .clang-format
 .clang-tidy
 ffigen.yaml
-winget_dart_implementation_plan.md
 .github/
+
+# Implementation plan
+winget_dart_implementation_plan.md
+
+# Dart tool cache
+.dart_tool/
+pubspec.lock
