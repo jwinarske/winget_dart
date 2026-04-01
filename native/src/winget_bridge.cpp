@@ -1,9 +1,8 @@
 // native/src/winget_bridge.cpp
 // SPDX-License-Identifier: Apache-2.0
 //
-// Phase 1 — stub no-op implementations of the flat C ABI.
-// Each function compiles and links but does not perform real WinGet operations.
-// Full implementations are added in Phase 2 (core) and Phase 3 (install/simulate).
+// Phase 2 — core bridge operations: lifecycle, catalogs, search, find, list.
+// Phase 3 stubs remain for: install, upgrade, uninstall, simulate, get_updates.
 
 #include "winget_bridge.h"
 #include "winget_manager.h"
@@ -12,7 +11,15 @@
 
 #include <atomic>
 #include <mutex>
+#include <string>
 #include <unordered_map>
+
+#define WINRT_LEAN_AND_MEAN
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Microsoft.Management.Deployment.h>
+
+using namespace winrt::Microsoft::Management::Deployment;
 
 namespace {
 
@@ -51,7 +58,202 @@ void FreeHandle(int64_t handle) {
   delete tx;
 }
 
+// ---------------------------------------------------------------------------
+// Coroutine helpers — all run on the COM apartment thread.
+// ---------------------------------------------------------------------------
+
+// Helper: open a composite catalog spanning all configured sources.
+static winrt::fire_and_forget DoListCatalogs(int64_t handle, Dart_Port port) {
+  using namespace winget_nc;
+  auto* tx = LookupHandle(handle);
+  if (!tx || tx->cancelled) {
+    PostToDart(port, EncodeCancelled());
+    co_return;
+  }
+  try {
+    auto pm = g_manager->CreatePackageManager();
+    auto catalogs = pm.GetPackageCatalogs();
+    for (auto const& ref : catalogs) {
+      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      PostToDart(port, EncodeCatalog(ref.Info()));
+    }
+    PostToDart(port, EncodeDone());
+  } catch (const winrt::hresult_error& e) {
+    PostToDart(port, EncodeWinrtError(e));
+  }
+}
+
+static winrt::fire_and_forget DoSearchName(int64_t handle,
+                                            std::string query,
+                                            Dart_Port port) {
+  using namespace winget_nc;
+  auto* tx = LookupHandle(handle);
+  if (!tx || tx->cancelled) {
+    PostToDart(port, EncodeCancelled());
+    co_return;
+  }
+  try {
+    auto pm = g_manager->CreatePackageManager();
+
+    // Open the composite catalog (winget + msstore + any custom sources).
+    auto catalogs = pm.GetPackageCatalogs();
+    CreateCompositePackageCatalogOptions opts;
+    for (auto const& ref : catalogs) {
+      opts.Catalogs().Append(ref);
+    }
+    opts.CompositeSearchBehavior(
+        CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+
+    auto composite = pm.CreateCompositePackageCatalog(opts);
+    auto connectResult = co_await composite.ConnectAsync();
+    if (connectResult.Status() != ConnectResultStatus::Ok) {
+      PostToDart(port, EncodeError("Catalog connect failed", 0));
+      co_return;
+    }
+    auto catalog = connectResult.PackageCatalog();
+
+    // Build search filter.
+    FindPackagesOptions findOpts;
+    PackageMatchFilter filter;
+    filter.Field(PackageMatchField::Name);
+    filter.Option(PackageFieldMatchOption::ContainsCaseInsensitive);
+    filter.Value(winrt::to_hstring(query));
+    findOpts.Filters().Append(filter);
+
+    auto findOp = catalog.FindPackagesAsync(findOpts);
+    tx->current_op = findOp;
+    auto findResult = co_await findOp;
+    tx->current_op = nullptr;
+
+    for (auto const& match : findResult.Matches()) {
+      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      PostToDart(port, EncodePackage(match.CatalogPackage(), "composite"));
+    }
+    PostToDart(port, EncodeDone());
+
+  } catch (const winrt::hresult_error& e) {
+    PostToDart(port, EncodeWinrtError(e));
+  }
+}
+
+static winrt::fire_and_forget DoFindById(int64_t handle,
+                                          std::string package_id,
+                                          std::string catalog_id,
+                                          Dart_Port port) {
+  using namespace winget_nc;
+  auto* tx = LookupHandle(handle);
+  if (!tx || tx->cancelled) {
+    PostToDart(port, EncodeCancelled());
+    co_return;
+  }
+  try {
+    auto pm = g_manager->CreatePackageManager();
+
+    // If a specific catalog is requested, use only that one.
+    // Otherwise, create a composite catalog across all sources.
+    PackageCatalog catalog{nullptr};
+
+    if (!catalog_id.empty()) {
+      auto ref = pm.GetPackageCatalogByName(winrt::to_hstring(catalog_id));
+      if (!ref) {
+        PostToDart(port, EncodeError(
+            "Catalog not found: " + catalog_id, 0));
+        co_return;
+      }
+      auto connectResult = co_await ref.ConnectAsync();
+      if (connectResult.Status() != ConnectResultStatus::Ok) {
+        PostToDart(port, EncodeError("Catalog connect failed", 0));
+        co_return;
+      }
+      catalog = connectResult.PackageCatalog();
+    } else {
+      auto catalogs = pm.GetPackageCatalogs();
+      CreateCompositePackageCatalogOptions opts;
+      for (auto const& ref : catalogs) {
+        opts.Catalogs().Append(ref);
+      }
+      opts.CompositeSearchBehavior(
+          CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+      auto composite = pm.CreateCompositePackageCatalog(opts);
+      auto connectResult = co_await composite.ConnectAsync();
+      if (connectResult.Status() != ConnectResultStatus::Ok) {
+        PostToDart(port, EncodeError("Catalog connect failed", 0));
+        co_return;
+      }
+      catalog = connectResult.PackageCatalog();
+    }
+
+    // Build exact ID match filter.
+    FindPackagesOptions findOpts;
+    PackageMatchFilter filter;
+    filter.Field(PackageMatchField::Id);
+    filter.Option(PackageFieldMatchOption::EqualsCaseInsensitive);
+    filter.Value(winrt::to_hstring(package_id));
+    findOpts.Filters().Append(filter);
+
+    auto findOp = catalog.FindPackagesAsync(findOpts);
+    tx->current_op = findOp;
+    auto findResult = co_await findOp;
+    tx->current_op = nullptr;
+
+    auto matches = findResult.Matches();
+    if (matches.Size() > 0) {
+      auto pkg = matches.GetAt(0).CatalogPackage();
+      PostToDart(port, EncodePackage(pkg,
+          catalog_id.empty() ? "composite" : catalog_id));
+    } else {
+      PostToDart(port, EncodeError(
+          "Package not found: " + package_id, 0));
+    }
+
+  } catch (const winrt::hresult_error& e) {
+    PostToDart(port, EncodeWinrtError(e));
+  }
+}
+
+static winrt::fire_and_forget DoListInstalled(int64_t handle, Dart_Port port) {
+  using namespace winget_nc;
+  auto* tx = LookupHandle(handle);
+  if (!tx || tx->cancelled) {
+    PostToDart(port, EncodeCancelled());
+    co_return;
+  }
+  try {
+    auto pm = g_manager->CreatePackageManager();
+
+    // Open the local installed catalog.
+    auto localRef = pm.GetLocalPackageCatalog(
+        LocalPackageCatalog::InstalledPackages);
+    auto connectResult = co_await localRef.ConnectAsync();
+    if (connectResult.Status() != ConnectResultStatus::Ok) {
+      PostToDart(port, EncodeError("Local catalog connect failed", 0));
+      co_return;
+    }
+    auto catalog = connectResult.PackageCatalog();
+
+    // Empty search = return all installed packages.
+    FindPackagesOptions findOpts;
+    auto findOp = catalog.FindPackagesAsync(findOpts);
+    tx->current_op = findOp;
+    auto findResult = co_await findOp;
+    tx->current_op = nullptr;
+
+    for (auto const& match : findResult.Matches()) {
+      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      PostToDart(port, EncodePackage(match.CatalogPackage(), "local"));
+    }
+    PostToDart(port, EncodeDone());
+
+  } catch (const winrt::hresult_error& e) {
+    PostToDart(port, EncodeWinrtError(e));
+  }
+}
+
 }  // namespace
+
+// ===========================================================================
+// Exported C ABI functions
+// ===========================================================================
 
 // ---------------------------------------------------------------------------
 // wg_init
@@ -79,8 +281,7 @@ extern "C" int32_t wg_init(void* post_c_object) {
 extern "C" int32_t wg_is_available(void) {
   try {
     // Probe: attempt to get the activation factory without creating an instance.
-    winrt::get_activation_factory<
-        winrt::Microsoft::Management::Deployment::PackageManager>();
+    winrt::get_activation_factory<PackageManager>();
     return 1;
   } catch (...) {
     return 0;
@@ -117,44 +318,48 @@ extern "C" void wg_disconnect(int64_t handle) {
 }
 
 // ---------------------------------------------------------------------------
-// wg_list_catalogs — stub (Phase 2)
+// wg_list_catalogs
 // ---------------------------------------------------------------------------
 extern "C" void wg_list_catalogs(int64_t handle, int64_t reply_port) {
-  // TODO(Phase 2): Enumerate pm.GetPackageCatalogs() and post JSON.
-  winget_nc::PostToDart(reply_port, winget_nc::EncodeDone());
+  if (!g_manager) return;
+  g_manager->Dispatch([handle, reply_port]() noexcept {
+    DoListCatalogs(handle, static_cast<Dart_Port>(reply_port));
+  });
 }
 
 // ---------------------------------------------------------------------------
-// wg_search_name — stub (Phase 2)
+// wg_search_name
 // ---------------------------------------------------------------------------
-extern "C" void wg_search_name(int64_t handle, const char* query,
+extern "C" void wg_search_name(int64_t handle, const char* query_utf8,
                                 int64_t reply_port) {
-  // TODO(Phase 2): Composite catalog search + streaming posts.
-  (void)handle;
-  (void)query;
-  winget_nc::PostToDart(reply_port, winget_nc::EncodeDone());
+  if (!g_manager) return;
+  std::string query(query_utf8);
+  g_manager->Dispatch([handle, query, reply_port]() noexcept {
+    DoSearchName(handle, query, static_cast<Dart_Port>(reply_port));
+  });
 }
 
 // ---------------------------------------------------------------------------
-// wg_find_by_id — stub (Phase 2)
+// wg_find_by_id
 // ---------------------------------------------------------------------------
 extern "C" void wg_find_by_id(int64_t handle, const char* package_id,
                                const char* catalog_id, int64_t reply_port) {
-  // TODO(Phase 2): Exact ID match across composite catalog.
-  (void)handle;
-  (void)package_id;
-  (void)catalog_id;
-  winget_nc::PostToDart(reply_port,
-      winget_nc::EncodeError("Not implemented", 0));
+  if (!g_manager) return;
+  std::string pid(package_id);
+  std::string cid(catalog_id ? catalog_id : "");
+  g_manager->Dispatch([handle, pid, cid, reply_port]() noexcept {
+    DoFindById(handle, pid, cid, static_cast<Dart_Port>(reply_port));
+  });
 }
 
 // ---------------------------------------------------------------------------
-// wg_list_installed — stub (Phase 2)
+// wg_list_installed
 // ---------------------------------------------------------------------------
 extern "C" void wg_list_installed(int64_t handle, int64_t reply_port) {
-  // TODO(Phase 2): Local installed catalog enumeration.
-  (void)handle;
-  winget_nc::PostToDart(reply_port, winget_nc::EncodeDone());
+  if (!g_manager) return;
+  g_manager->Dispatch([handle, reply_port]() noexcept {
+    DoListInstalled(handle, static_cast<Dart_Port>(reply_port));
+  });
 }
 
 // ---------------------------------------------------------------------------
