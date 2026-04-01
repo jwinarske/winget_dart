@@ -13,7 +13,7 @@ add_executable(bridge_test
 
 target_include_directories(bridge_test PRIVATE
   ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/third_party/dart
+  ${CMAKE_SOURCE_DIR}/third_party
   ${CMAKE_SOURCE_DIR}/third_party/winget_interop/include
 )
 

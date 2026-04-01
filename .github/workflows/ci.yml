@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # C++ build verification — x64
+  cpp-build-x64:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NuGet packages and generate projection headers
+        shell: pwsh
+        run: |
+          # Download WinGet COM interop (WinMD + DLLs)
+          nuget install Microsoft.WindowsPackageManager.ComInterop -OutputDirectory _nuget -NonInteractive
+          $interop = Get-ChildItem _nuget/Microsoft.WindowsPackageManager.ComInterop.* -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          Write-Host "Interop package: $interop"
+
+          # Find cppwinrt.exe from the Windows SDK
+          $cppwinrt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\cppwinrt.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $cppwinrt) {
+            Write-Host "::error::cppwinrt.exe not found in Windows SDK"
+            exit 1
+          }
+          Write-Host "Found cppwinrt.exe: $cppwinrt"
+
+          # Find the Windows SDK metadata directory (needed as -ref for cppwinrt)
+          # Filter to versioned dirs only (exclude "Facade" which lacks type metadata)
+          $sdkMeta = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $sdkMeta) {
+            Write-Host "::error::Windows SDK UnionMetadata not found"
+            exit 1
+          }
+          Write-Host "SDK metadata: $sdkMeta"
+
+          # Find the WinGet WinMD
+          $winmd = Get-ChildItem "$interop" -Recurse -Filter "*.winmd" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $winmd) {
+            Write-Host "::error::No WinMD found in NuGet package"
+            exit 1
+          }
+          Write-Host "Found WinMD: $($winmd.FullName)"
+
+          # Generate C++/WinRT projection headers with SDK reference
+          $outDir = "native/third_party/winget_interop/include"
+          & $cppwinrt -in "$($winmd.FullName)" -ref "$($sdkMeta.FullName)" -out $outDir
+          Write-Host "Generated projection headers to $outDir"
+
+          # Verify the key header was generated
+          if (Test-Path "$outDir/winrt/Microsoft.Management.Deployment.h") {
+            Write-Host "OK: winrt/Microsoft.Management.Deployment.h exists"
+          } else {
+            Write-Host "::error::winrt/Microsoft.Management.Deployment.h was not generated"
+            exit 1
+          }
+
+      - name: Configure CMake
+        run: >
+          cmake -B build native/
+          -G "Visual Studio 17 2022" -A x64
+          -DTARGET_ARCH=x64
+          -DBUILD_TESTING=OFF
+
+      - name: Build
+        run: cmake --build build --config Release
+
+  # C++ cross-compile — ARM64 (build only, cannot run on x64 host)
+  cpp-build-arm64:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NuGet packages and generate projection headers
+        shell: pwsh
+        run: |
+          nuget install Microsoft.WindowsPackageManager.ComInterop -OutputDirectory _nuget -NonInteractive
+          $interop = Get-ChildItem _nuget/Microsoft.WindowsPackageManager.ComInterop.* -Directory | Sort-Object Name -Descending | Select-Object -First 1
+
+          $cppwinrt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\cppwinrt.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          $sdkMeta = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.*" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+          $winmd = Get-ChildItem "$interop" -Recurse -Filter "*.winmd" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          if ($cppwinrt -and $sdkMeta -and $winmd) {
+            & $cppwinrt -in "$($winmd.FullName)" -ref "$($sdkMeta.FullName)" -out native/third_party/winget_interop/include
+          }
+
+      - name: Configure CMake (ARM64 cross)
+        run: >
+          cmake -B build native/
+          -G "Visual Studio 17 2022" -A ARM64
+          -DTARGET_ARCH=arm64
+          -DBUILD_TESTING=OFF
+
+      - name: Build
+        run: cmake --build build --config Release
+
+  # Dart unit tests (mock bridge — no native compile needed)
+  dart-unit-tests:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart test --exclude-tags=integration
+
+  # Dart integration tests — x64 live WinGet
+  dart-integration-x64:
+    runs-on: windows-2022
+    if: github.event_name == 'push'
+    env:
+      RUN_INTEGRATION_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart test --tags=integration
+        continue-on-error: true
+
+  # Coverage (unit tests only)
+  coverage:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart pub global activate coverage
+      - run: dart test --coverage=coverage --exclude-tags=integration
+      - name: Format coverage
+        run: >
+          dart pub global run coverage:format_coverage
+          --lcov --in=coverage --out=coverage/lcov.info
+        if: always()
+      - uses: codecov/codecov-action@v4
+        with:
+          files: coverage/lcov.info
+        if: always()
+        continue-on-error: true

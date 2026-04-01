@@ -5,6 +5,7 @@
 // Full implementation is Phase 2.
 
 #include "winget_manager.h"
+#include <objbase.h>
 #include <stdexcept>
 
 namespace winget_nc {
@@ -124,15 +125,25 @@ void WgManager::Dispatch(std::function<void()> fn) {
   if (hwnd_) ::PostMessageW(hwnd_, WM_DISPATCH_TASK, 0, 0);
 }
 
-IPackageManager WgManager::CreatePackageManager() {
+// WinGet COM activation GUIDs.
+// Standard factory for non-elevated processes, elevated for admin processes.
+// Using the wrong factory for the current elevation level causes a hard crash.
+// Source: https://github.com/microsoft/winget-cli
+static constexpr winrt::guid CLSID_PackageManagerStandard{
+    0xC53A4F16, 0x787E, 0x42A4, {0xB3, 0x04, 0x29, 0xEF, 0xFB, 0x4B, 0xF5, 0x97}};
+static constexpr winrt::guid CLSID_PackageManagerElevated{
+    0x526534B8, 0x7E46, 0x47C8, {0x84, 0x16, 0xB1, 0x68, 0x5C, 0x32, 0x7D, 0x37}};
+
+PackageManager WgManager::CreatePackageManager() {
   // Factory selection: wrong factory -> hard crash, no exception.
   // Always detect elevation fresh; do not cache.
-  if (IsElevated()) {
-    WindowsPackageManagerElevatedFactory factory;
-    return factory.CreatePackageManager();
-  }
-  WindowsPackageManagerStandardFactory factory;
-  return factory.CreatePackageManager();
+  const auto& clsid = IsElevated()
+      ? CLSID_PackageManagerElevated
+      : CLSID_PackageManagerStandard;
+
+  // Use winrt::create_instance for COM activation — works with
+  // C++/WinRT's apartment model and avoids raw CoCreateInstance.
+  return winrt::create_instance<PackageManager>(clsid, CLSCTX_ALL);
 }
 
 }  // namespace winget_nc

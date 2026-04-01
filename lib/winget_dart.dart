@@ -5,6 +5,7 @@
 /// interface. Supports Windows x64 and ARM64.
 library winget_dart;
 
+export 'src/bridge/winget_bridge.dart';
 export 'src/wg_client.dart';
 export 'src/wg_transaction.dart';
 export 'src/models/wg_package.dart';

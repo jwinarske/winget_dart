@@ -3,24 +3,24 @@ import 'package:winget_dart/winget_dart.dart';
 import 'helpers/fake_winget_bridge.dart';
 
 void main() {
-  group('WgClient.connectWith', () {
+  group('WgClient.connect', () {
     test('connects successfully with default fake', () async {
       final fake = FakeWingetBridge();
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
       expect(client, isNotNull);
     });
 
     test('throws WgNotAvailableException when unavailable', () {
       final fake = FakeWingetBridge()..stubIsAvailable(false);
-      expect(WgClient.connectWith(fake),
+      expect(WgClient.connect(fake),
           throwsA(isA<WgNotAvailableException>()));
     });
 
     test('throws WgException on connect error', () {
       final fake = FakeWingetBridge()
         ..stubConnect(ok: false, errorMessage: 'COM failure', hresult: -1);
-      expect(WgClient.connectWith(fake), throwsA(isA<WgException>()));
+      expect(WgClient.connect(fake), throwsA(isA<WgException>()));
     });
   });
 
@@ -32,7 +32,7 @@ void main() {
           Msg.catalog('msstore', name: 'Microsoft Store'),
           Msg.done,
         ]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final catalogs = await client.listCatalogs();
@@ -43,7 +43,7 @@ void main() {
 
     test('returns empty list when no catalogs', () async {
       final fake = FakeWingetBridge()..stubCatalogs([Msg.done]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
       expect(await client.listCatalogs(), isEmpty);
     });
@@ -56,7 +56,7 @@ void main() {
           Msg.pkg(id: 'Kitware.CMake', name: 'CMake', version: '3.28.0'),
           Msg.done,
         ]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final packages = await client.searchName('cmake').result;
@@ -70,7 +70,7 @@ void main() {
       final fake = FakeWingetBridge()
         ..stubFindById('Kitware.CMake',
             Msg.pkg(id: 'Kitware.CMake', name: 'CMake'));
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final pkg = await client.findById('Kitware.CMake');
@@ -81,7 +81,7 @@ void main() {
     test('throws on error', () async {
       final fake = FakeWingetBridge()
         ..stubFindById('Nope', Msg.error('Not found'));
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       expect(client.findById('Nope'), throwsA(isA<WgException>()));
@@ -96,7 +96,7 @@ void main() {
             Msg.plan(installing: [
               {'id': 'Kitware.CMake', 'name': 'CMake', 'version': '3.28.0'}
             ]));
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final plan = await client.simulateInstall('Kitware.CMake');
@@ -107,7 +107,7 @@ void main() {
     test('returns empty plan', () async {
       final fake = FakeWingetBridge()
         ..stubSimulateInstall('Already.Installed', Msg.plan());
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final plan = await client.simulateInstall('Already.Installed');
@@ -123,7 +123,7 @@ void main() {
           Msg.progress(75, state: 'installing'),
           Msg.success,
         ]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final tx = client.installPackage('Pkg.A');
@@ -140,7 +140,7 @@ void main() {
     test('completes successfully', () async {
       final fake = FakeWingetBridge()
         ..stubUpgrade('Pkg.A', [Msg.success]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       await client.upgradePackage('Pkg.A').result;
@@ -151,7 +151,7 @@ void main() {
     test('completes successfully', () async {
       final fake = FakeWingetBridge()
         ..stubUninstall('Pkg.A', [Msg.success]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       await client.uninstallPackage('Pkg.A').result;
@@ -165,7 +165,7 @@ void main() {
           Msg.pkg(id: 'Pkg.A', name: 'A', source: 'local'),
           Msg.done,
         ]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final packages = await client.listInstalled().result;
@@ -185,7 +185,7 @@ void main() {
               availableVersion: '2.0.0'),
           Msg.done,
         ]);
-      final client = await WgClient.connectWith(fake);
+      final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
       final updates = await client.getUpdates().result;

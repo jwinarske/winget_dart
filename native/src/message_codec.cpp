@@ -172,7 +172,7 @@ std::string EncodeUninstallProgress(const UninstallProgress& p) {
   int pct = static_cast<int>(p.UninstallationProgress * 100.0);
   std::ostringstream o;
   o << R"({"progress":{"percent":)" << pct
-    << R"(,"state":"installing","label":"Uninstalling ()" << pct << R"(%)"}})";
+    << R"(,"state":"uninstalling","label":"Uninstalling )" << pct << R"(%"}})";
   return o.str();
 }
 

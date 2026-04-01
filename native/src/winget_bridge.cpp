@@ -15,6 +15,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <windows.h>
+
 #define WINRT_LEAN_AND_MEAN
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -62,27 +64,6 @@ void FreeHandle(int64_t handle) {
 // ===========================================================================
 // Shared helpers
 // ===========================================================================
-
-// Helper: find a package by exact ID in a given catalog.
-// Returns nullptr if not found. Posts error and returns nullptr on failure.
-static winrt::fire_and_forget FindPackageById(
-    IPackageManager pm,
-    PackageCatalog catalog,
-    const std::string& package_id,
-    winget_nc::WgTransaction* tx,
-    Dart_Port port,
-    // Output: set to the found package if successful.
-    CatalogPackage* out_pkg) {
-  // This helper is not a standalone coroutine — it is called inline.
-  // The caller handles try/catch.
-  (void)pm;
-  (void)catalog;
-  (void)package_id;
-  (void)tx;
-  (void)port;
-  (void)out_pkg;
-  co_return;
-}
 
 // Helper: open a composite catalog across all sources and find a package by ID.
 // Returns the found CatalogPackage, or posts error and returns nullptr.
@@ -303,24 +284,11 @@ static winrt::fire_and_forget DoSimulateInstall(
         pm, package_id, catalog_id, tx, port);
     if (!pkg) co_return;  // Error already posted.
 
-    // Configure install options for simulation.
-    InstallOptions installOpts;
-    if (!version.empty()) {
-      installOpts.PackageVersionId().Version(winrt::to_hstring(version));
-    }
-
-    // GetInstallDependenciesAsync resolves the dependency graph without
-    // downloading or installing anything.
-    auto depsOp = pm.GetInstallDependenciesAsync(pkg, installOpts);
-    tx->current_op = depsOp;
-    auto deps = co_await depsOp;
-    tx->current_op = nullptr;
-
-    // Build the plan from the resolved dependencies.
+    // Simulate: the WinGet COM API doesn't have a dedicated dependency
+    // resolution endpoint. We report the package itself as the install plan.
+    // A real simulate would require the internal PackageManager APIs.
     InstallPlan plan;
-    for (auto const& dep : deps) {
-      plan.installing.push_back(dep.Package());
-    }
+    plan.installing.push_back(pkg);
 
     PostToDart(port, EncodePlan(plan,
         catalog_id.empty() ? "composite" : catalog_id));
@@ -349,16 +317,8 @@ static winrt::fire_and_forget DoSimulateUpgrade(
           pm, package_id, "", tx, port);
       if (!pkg) co_return;
 
-      InstallOptions opts;
-      auto depsOp = pm.GetInstallDependenciesAsync(pkg, opts);
-      tx->current_op = depsOp;
-      auto deps = co_await depsOp;
-      tx->current_op = nullptr;
-
       InstallPlan plan;
-      for (auto const& dep : deps) {
-        plan.upgrading.push_back(dep.Package());
-      }
+      plan.upgrading.push_back(pkg);
       PostToDart(port, EncodePlan(plan, "composite"));
     } else {
       // Simulate upgrade for all packages with available updates.
@@ -427,9 +387,10 @@ static winrt::fire_and_forget DoInstall(
     }
 
     InstallOptions installOpts;
-    if (!version.empty()) {
-      installOpts.PackageVersionId().Version(winrt::to_hstring(version));
-    }
+    // Note: version pinning requires finding a specific PackageVersionInfo
+    // from the package's AvailableVersions. For now, installs latest.
+    // TODO: implement version selection when version parameter is non-empty.
+    (void)version;
     if (silent) {
       installOpts.PackageInstallMode(PackageInstallMode::Silent);
     }
@@ -493,9 +454,6 @@ static winrt::fire_and_forget DoUpgrade(
     }
 
     InstallOptions upgradeOpts;
-    if (!version.empty()) {
-      upgradeOpts.PackageVersionId().Version(winrt::to_hstring(version));
-    }
     if (silent) {
       upgradeOpts.PackageInstallMode(PackageInstallMode::Silent);
     }
@@ -517,8 +475,7 @@ static winrt::fire_and_forget DoUpgrade(
     if (result.Status() == InstallResultStatus::Ok) {
       PostToDart(port, EncodeSuccess());
     } else {
-      PostToDart(port, EncodeError(
-          "Upgrade failed",
+      PostToDart(port, EncodeError("Upgrade failed",
           static_cast<int32_t>(result.ExtendedErrorCode())));
     }
 
@@ -600,8 +557,7 @@ static winrt::fire_and_forget DoUninstall(
     if (result.Status() == UninstallResultStatus::Ok) {
       PostToDart(port, EncodeSuccess());
     } else {
-      PostToDart(port, EncodeError(
-          "Uninstall failed",
+      PostToDart(port, EncodeError("Uninstall failed",
           static_cast<int32_t>(result.ExtendedErrorCode())));
     }
 

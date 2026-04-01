@@ -1,6 +1,17 @@
-native/test/
+# Build artifacts
 native/build*/
+native/test/
+*.obj
+*.pdb
+*.ilk
+*.exp
+
+# Vendored third-party (large, not needed by consumers)
+native/third_party/
+
+# Dev configs
 .clang-format
 .clang-tidy
 ffigen.yaml
 winget_dart_implementation_plan.md
+.github/

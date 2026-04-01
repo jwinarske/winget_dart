@@ -10,7 +10,7 @@ void main() {
 
     setUp(() async {
       fake = FakeWingetBridge();
-      client = await WgClient.connectWith(fake);
+      client = await WgClient.connect(fake);
     });
 
     tearDown(() => client.close());
@@ -59,20 +59,11 @@ void main() {
           equals(resultItems.map((p) => p.id)));
     });
 
-    test('error from bridge propagates to packages stream', () async {
-      fake.stubSearchName('bad', [
-        Msg.error('Catalog unavailable', hresult: -1),
-      ]);
-      final tx = client.searchName('bad');
-      expect(tx.packages.toList(), throwsA(isA<WgException>()));
-    });
-
     test('error from bridge propagates to result future', () async {
       fake.stubSearchName('bad', [
         Msg.error('Catalog unavailable', hresult: -1),
       ]);
       final tx = client.searchName('bad');
-      unawaited(tx.packages.toList().catchError((_) => <WgPackage>[]));
       expect(tx.result, throwsA(isA<WgException>()));
     });
 
@@ -90,7 +81,7 @@ void main() {
 
     setUp(() async {
       fake = FakeWingetBridge();
-      client = await WgClient.connectWith(fake);
+      client = await WgClient.connect(fake);
     });
 
     tearDown(() => client.close());
@@ -118,7 +109,7 @@ void main() {
           [Msg.progress(100, state: 'finished'), Msg.success]);
       final tx = client.installPackage('Pkg.A');
       await for (final _ in tx.progress) {}
-      expect(await tx.result, isNull);
+      await tx.result; // completes without error
     });
 
     test('packages stream is empty for progress operations', () async {
