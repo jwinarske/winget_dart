@@ -247,3 +247,156 @@ TEST_F(MessageProtocolTest, AllTerminalMessagesAreBalancedJson) {
   check(winget_nc::EncodeError("test", 0));
   check(winget_nc::EncodeError("test", -2147024894));
 }
+
+// ===========================================================================
+// Install Progress Encoding Tests (requires WinRT types — Windows only)
+// ===========================================================================
+#ifdef WINGET_LIVE_TESTS
+
+class ProgressEncoderTest : public ::testing::Test {};
+
+TEST_F(ProgressEncoderTest, DownloadingProgressMapsTo0Through50) {
+  using namespace winget_nc;
+  InstallProgress p{};
+  p.State = PackageInstallProgressState::Downloading;
+  p.DownloadProgress = 0.5;  // 50% of download = 25% overall
+  auto json = EncodeInstallProgress(p);
+  EXPECT_NE(json.find("\"percent\":25"), std::string::npos);
+  EXPECT_NE(json.find("\"state\":\"downloading\""), std::string::npos);
+}
+
+TEST_F(ProgressEncoderTest, InstallingProgressMapsTo50Through100) {
+  using namespace winget_nc;
+  InstallProgress p{};
+  p.State = PackageInstallProgressState::Installing;
+  p.InstallationProgress = 0.5;  // 50% of install = 75% overall
+  auto json = EncodeInstallProgress(p);
+  EXPECT_NE(json.find("\"percent\":75"), std::string::npos);
+  EXPECT_NE(json.find("\"state\":\"installing\""), std::string::npos);
+}
+
+TEST_F(ProgressEncoderTest, FinishedIs100Percent) {
+  using namespace winget_nc;
+  InstallProgress p{};
+  p.State = PackageInstallProgressState::Finished;
+  auto json = EncodeInstallProgress(p);
+  EXPECT_NE(json.find("\"percent\":100"), std::string::npos);
+  EXPECT_NE(json.find("\"state\":\"finished\""), std::string::npos);
+  EXPECT_NE(json.find("\"label\":\"Complete\""), std::string::npos);
+}
+
+TEST_F(ProgressEncoderTest, QueuedIsZeroPercent) {
+  using namespace winget_nc;
+  InstallProgress p{};
+  p.State = PackageInstallProgressState::Queued;
+  auto json = EncodeInstallProgress(p);
+  EXPECT_NE(json.find("\"percent\":0"), std::string::npos);
+  EXPECT_NE(json.find("\"state\":\"queued\""), std::string::npos);
+}
+
+TEST_F(ProgressEncoderTest, PostInstallLabel) {
+  using namespace winget_nc;
+  InstallProgress p{};
+  p.State = PackageInstallProgressState::PostInstall;
+  auto json = EncodeInstallProgress(p);
+  EXPECT_NE(json.find("\"label\":\"Finishing up...\""), std::string::npos);
+}
+
+TEST_F(ProgressEncoderTest, UninstallProgressEncoding) {
+  using namespace winget_nc;
+  UninstallProgress p{};
+  p.UninstallationProgress = 0.75;
+  auto json = EncodeUninstallProgress(p);
+  EXPECT_NE(json.find("\"percent\":75"), std::string::npos);
+  EXPECT_NE(json.find("Uninstalling"), std::string::npos);
+}
+
+// ===========================================================================
+// Plan Encoding Tests (requires WinRT types — Windows only)
+// ===========================================================================
+class PlanEncoderTest : public ::testing::Test {};
+
+TEST_F(PlanEncoderTest, EmptyPlanHasEmptyArrays) {
+  using namespace winget_nc;
+  InstallPlan plan;
+  auto json = EncodePlan(plan, "winget");
+  EXPECT_NE(json.find("\"installing\":[]"), std::string::npos);
+  EXPECT_NE(json.find("\"upgrading\":[]"), std::string::npos);
+  EXPECT_NE(json.find("\"removing\":[]"), std::string::npos);
+}
+
+#endif  // WINGET_LIVE_TESTS
+
+// ===========================================================================
+// Sequential Install Guard Tests
+// ===========================================================================
+// These test the TryStartMutatingOp / EndMutatingOp logic in WgTransaction.
+// They do not require WinRT since the guard is pure atomic logic.
+
+#include "winget_transaction.h"
+
+class InstallGuardTest : public ::testing::Test {};
+
+TEST_F(InstallGuardTest, FirstMutatingOpSucceeds) {
+  winget_nc::WgTransaction tx(0);
+  EXPECT_TRUE(tx.TryStartMutatingOp());
+  tx.EndMutatingOp();
+}
+
+TEST_F(InstallGuardTest, SecondMutatingOpFails) {
+  winget_nc::WgTransaction tx(0);
+  EXPECT_TRUE(tx.TryStartMutatingOp());
+  EXPECT_FALSE(tx.TryStartMutatingOp());
+  tx.EndMutatingOp();
+}
+
+TEST_F(InstallGuardTest, MutatingOpReusableAfterEnd) {
+  winget_nc::WgTransaction tx(0);
+  EXPECT_TRUE(tx.TryStartMutatingOp());
+  tx.EndMutatingOp();
+  EXPECT_TRUE(tx.TryStartMutatingOp());
+  tx.EndMutatingOp();
+}
+
+TEST_F(InstallGuardTest, CancelSetsCancelledFlag) {
+  winget_nc::WgTransaction tx(0);
+  EXPECT_FALSE(tx.cancelled.load());
+  tx.Cancel();
+  EXPECT_TRUE(tx.cancelled.load());
+}
+
+// ===========================================================================
+// Progress Message Protocol Tests (no WinRT needed)
+// ===========================================================================
+class ProgressProtocolTest : public ::testing::Test {
+ protected:
+  void SetUp() override { ClearPostedMessages(); }
+  void TearDown() override { ClearPostedMessages(); }
+};
+
+TEST_F(ProgressProtocolTest, ErrorMessageForNotInstalledPackage) {
+  // Simulate the error that DoUninstall would post when a package isn't found.
+  auto json = winget_nc::EncodeError("Package not installed: SomeApp", 0);
+  EXPECT_NE(json.find("\"error\""), std::string::npos);
+  EXPECT_NE(json.find("Package not installed: SomeApp"), std::string::npos);
+}
+
+TEST_F(ProgressProtocolTest, MutatingOpBusyError) {
+  auto json = winget_nc::EncodeError(
+      "Another install/upgrade/uninstall is already in progress", 0);
+  EXPECT_NE(json.find("already in progress"), std::string::npos);
+  EXPECT_NE(json.find("\"hresult\":0"), std::string::npos);
+}
+
+TEST_F(ProgressProtocolTest, SuccessAfterInstall) {
+  // The expected post-install success message.
+  auto json = winget_nc::EncodeSuccess();
+  EXPECT_EQ(json, R"({"result":{"success":true}})");
+}
+
+TEST_F(ProgressProtocolTest, InstallFailedErrorIncludesHresult) {
+  // Simulate an install failure with a specific HRESULT.
+  auto json = winget_nc::EncodeError("Install failed", -2147024894);
+  EXPECT_NE(json.find("Install failed"), std::string::npos);
+  EXPECT_NE(json.find("-2147024894"), std::string::npos);
+}

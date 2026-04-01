@@ -28,7 +28,26 @@ struct WgTransaction {
 
   std::atomic<bool> cancelled{false};
 
+  // Sequential install guard: only one mutating operation (install/upgrade/
+  // uninstall) may run at a time per handle. Read operations (search, list)
+  // are not guarded. Attempting a second mutating op while one is in-flight
+  // posts an error and returns immediately.
+  std::atomic<bool> mutating_op{false};
+
   explicit WgTransaction(Dart_Port port) : reply_port(port) {}
+
+  /// Try to acquire the mutating operation lock.
+  /// Returns true if acquired, false if another mutating op is in progress.
+  bool TryStartMutatingOp() {
+    bool expected = false;
+    return mutating_op.compare_exchange_strong(
+        expected, true, std::memory_order_acq_rel);
+  }
+
+  /// Release the mutating operation lock.
+  void EndMutatingOp() {
+    mutating_op.store(false, std::memory_order_release);
+  }
 
   void Cancel() {
     cancelled.store(true, std::memory_order_release);
