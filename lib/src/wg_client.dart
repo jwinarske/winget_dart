@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
-import 'package:meta/meta.dart';
 import 'bridge/winget_bridge.dart';
-import 'bridge/native_winget_bridge.dart';
 import 'codec/message_decoder.dart';
 import 'models/wg_package.dart';
 import 'models/wg_install_plan.dart';
@@ -16,9 +14,11 @@ import 'wg_transaction.dart';
 /// Primary entry point for winget_dart.
 ///
 /// ```dart
-/// final client = await WgClient.connect();
-/// final tx = client.searchName('cmake');
-/// final packages = await tx.result;
+/// import 'package:winget_dart/winget_dart.dart';
+/// import 'package:winget_dart/src/bridge/native_winget_bridge.dart';
+///
+/// final client = await WgClient.connect(NativeWingetBridge());
+/// final packages = await client.searchName('cmake').result;
 /// for (final p in packages) print('${p.id} ${p.version}');
 /// await client.close();
 /// ```
@@ -35,22 +35,38 @@ class WgClient {
 
   /// Connect to the Windows Package Manager.
   ///
-  /// Throws [WgNotAvailableException] if WinGet (App Installer) is not present.
-  static Future<WgClient> connect() async {
-    return connectWith(NativeWingetBridge());
-  }
-
-  /// Connect using a custom [WingetBridge] implementation.
+  /// Pass a [WingetBridge] implementation — typically [NativeWingetBridge]
+  /// for production or a fake for testing.
   ///
-  /// Used by tests with [FakeWingetBridge]. Production code should use
-  /// [connect] which uses [NativeWingetBridge].
-  @visibleForTesting
-  static Future<WgClient> connectWith(WingetBridge bridge) async {
-    if (!bridge.isAvailable()) {
-      throw const WgNotAvailableException(
-          'Windows Package Manager (App Installer) is not installed or '
-          'not reachable. Windows 10 1809+ (x64) or Windows 11 (ARM64) '
-          'required.');
+  /// Retries with exponential backoff if WinGet is not yet registered
+  /// (common on freshly provisioned machines or first login). Set
+  /// [maxRetries] to 0 to fail immediately if WinGet is unavailable.
+  ///
+  /// Throws [WgNotAvailableException] if WinGet (App Installer) is not
+  /// present after all retries are exhausted.
+  static Future<WgClient> connect(
+    WingetBridge bridge, {
+    int maxRetries = 0,
+    Duration retryDelay = Duration.zero,
+  }) async {
+    // Retry loop for the fresh-login race condition (App Installer not
+    // yet registered after first login on a fresh Windows installation).
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      if (bridge.isAvailable()) break;
+
+      if (attempt == maxRetries) {
+        throw const WgNotAvailableException(
+            'Windows Package Manager (App Installer) is not installed or '
+            'not reachable. Windows 10 1809+ (x64) or Windows 11 (ARM64) '
+            'required. If this is a freshly provisioned machine, log out '
+            'and back in to complete App Installer registration.');
+      }
+      // Exponential backoff capped at 30 seconds.
+      final wait = retryDelay * (attempt + 1);
+      await Future<void>.delayed(
+          wait > const Duration(seconds: 30)
+              ? const Duration(seconds: 30)
+              : wait);
     }
 
     bridge.init();
@@ -220,12 +236,14 @@ class WgClient {
       } else if (decoded.containsKey('cancelled')) {
         final ex = const WgCancelledException();
         controller.addError(ex);
+        controller.close();
         completer.completeError(ex);
         port.close();
       } else if (decoded['error'] != null) {
         final ex = WgException(decoded['error'] as String,
             hresult: decoded['hresult'] as int?);
         controller.addError(ex);
+        controller.close();
         completer.completeError(ex);
         port.close();
       } else if (decoded['pkg'] != null) {

@@ -9,10 +9,11 @@
 #include <thread>
 #include <vector>
 
+#include <windows.h>
+
 #define WINRT_LEAN_AND_MEAN
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.Management.Deployment.h>
-#include "winget_interop/WindowsPackageManager.h"
 
 #include "dart/dart_api_dl.h"
 
@@ -44,9 +45,9 @@ class WgManager {
   /// to send results back to Dart.
   void Dispatch(std::function<void()> fn);
 
-  /// Create a new IPackageManager for a caller.
+  /// Create a new PackageManager for a caller.
   /// Returned object is valid only on the apartment thread.
-  IPackageManager CreatePackageManager();
+  PackageManager CreatePackageManager();
 
   bool IsRunning() const { return running_.load(std::memory_order_acquire); }
 
