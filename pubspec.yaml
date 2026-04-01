@@ -1,0 +1,32 @@
+name: winget_dart
+description: >-
+  Typed Dart API for the Windows Package Manager (WinGet) via the
+  Microsoft.Management.Deployment COM/WinRT interface. Supports search,
+  install, upgrade, uninstall, and simulate operations with async progress
+  streams. Targets Windows x64 and ARM64. Mirrors the architecture of
+  packagekit_dart.
+version: 0.1.0
+repository: https://github.com/toyota-connected/winget_dart
+issue_tracker: https://github.com/toyota-connected/winget_dart/issues
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  ffi: ^2.1.0
+  path: ^1.9.0
+  # Build hook dependencies
+  hooks: any
+  code_assets: any
+  native_toolchain_c: any
+
+dev_dependencies:
+  ffigen: ^18.0.0
+  test: ^1.24.0
+  lints: ^4.0.0
+
+platforms:
+  windows:
+
+topics:
+  [windows, winget, package-manager, com, winrt, ffi, arm64]

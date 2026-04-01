@@ -1,0 +1,12 @@
+name: WingetBindings
+description: FFI bindings for winget_nc.dll (flat C ABI).
+output: lib/src/bindings/winget_bindings.dart
+headers:
+  entry-points:
+    - native/src/winget_bridge.h
+compiler-opts:
+  - '-DWINGET_NC_EXPORTS'
+  - '-fms-extensions'
+functions:
+  include:
+    - 'wg_.*'
