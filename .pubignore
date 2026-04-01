@@ -1,0 +1,6 @@
+native/test/
+native/build*/
+.clang-format
+.clang-tidy
+ffigen.yaml
+winget_dart_implementation_plan.md
