@@ -13,8 +13,7 @@ void main() {
 
     test('throws WgNotAvailableException when unavailable', () {
       final fake = FakeWingetBridge()..stubIsAvailable(false);
-      expect(WgClient.connect(fake),
-          throwsA(isA<WgNotAvailableException>()));
+      expect(WgClient.connect(fake), throwsA(isA<WgNotAvailableException>()));
     });
 
     test('throws WgException on connect error', () {
@@ -68,8 +67,8 @@ void main() {
   group('WgClient.findById', () {
     test('returns package when found', () async {
       final fake = FakeWingetBridge()
-        ..stubFindById('Kitware.CMake',
-            Msg.pkg(id: 'Kitware.CMake', name: 'CMake'));
+        ..stubFindById(
+            'Kitware.CMake', Msg.pkg(id: 'Kitware.CMake', name: 'CMake'));
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
@@ -138,8 +137,7 @@ void main() {
 
   group('WgClient.upgradePackage', () {
     test('completes successfully', () async {
-      final fake = FakeWingetBridge()
-        ..stubUpgrade('Pkg.A', [Msg.success]);
+      final fake = FakeWingetBridge()..stubUpgrade('Pkg.A', [Msg.success]);
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
@@ -149,8 +147,7 @@ void main() {
 
   group('WgClient.uninstallPackage', () {
     test('completes successfully', () async {
-      final fake = FakeWingetBridge()
-        ..stubUninstall('Pkg.A', [Msg.success]);
+      final fake = FakeWingetBridge()..stubUninstall('Pkg.A', [Msg.success]);
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
 

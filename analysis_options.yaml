@@ -3,3 +3,4 @@ include: package:lints/recommended.yaml
 analyzer:
   exclude:
     - lib/src/bindings/winget_bindings.dart
+    - example/winget_catalog/**

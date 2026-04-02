@@ -1,0 +1,4 @@
+coverage:
+  ignore:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"

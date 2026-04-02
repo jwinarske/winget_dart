@@ -36,8 +36,7 @@ bool PostToDart(Dart_Port port, const std::string& json);
 /// Encode a CatalogPackage as {"pkg":{...}}.
 /// version:          installed version (or latest available for search results)
 /// available_version: non-empty when an upgrade is available
-std::string EncodePackage(const CatalogPackage& pkg,
-                          const std::string& catalog_id,
+std::string EncodePackage(const CatalogPackage& pkg, const std::string& catalog_id,
                           bool include_available_version = false);
 
 // ---------------------------------------------------------------------------

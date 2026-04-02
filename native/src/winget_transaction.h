@@ -7,8 +7,8 @@
 #include <string>
 
 #define WINRT_LEAN_AND_MEAN
-#include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.Management.Deployment.h>
+#include <winrt/Windows.Foundation.h>
 
 #include "dart/dart_api_dl.h"
 
@@ -40,19 +40,19 @@ struct WgTransaction {
   /// Returns true if acquired, false if another mutating op is in progress.
   bool TryStartMutatingOp() {
     bool expected = false;
-    return mutating_op.compare_exchange_strong(
-        expected, true, std::memory_order_acq_rel);
+    return mutating_op.compare_exchange_strong(expected, true, std::memory_order_acq_rel);
   }
 
   /// Release the mutating operation lock.
-  void EndMutatingOp() {
-    mutating_op.store(false, std::memory_order_release);
-  }
+  void EndMutatingOp() { mutating_op.store(false, std::memory_order_release); }
 
   void Cancel() {
     cancelled.store(true, std::memory_order_release);
     if (current_op) {
-      try { current_op.Cancel(); } catch (...) {}
+      try {
+        current_op.Cancel();
+      } catch (...) {
+      }
     }
   }
 };

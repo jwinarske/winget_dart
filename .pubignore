@@ -1,24 +1,17 @@
 # Build artifacts
-native/build*/
-native/test/
-*.obj
-*.pdb
-*.ilk
-*.exp
-*.lib
+_nuget/
+build-tidy/
+build/
+coverage/
 
-# Vendored third-party binaries (consumers compile from source via build hook)
-native/third_party/winget_interop/lib/
-
-# Dev configs
-.clang-format
-.clang-tidy
-ffigen.yaml
-.github/
-
-# Implementation plan
-winget_dart_implementation_plan.md
-
-# Dart tool cache
+# IDE / tooling
+.idea/
+.vscode/
+.claude/
 .dart_tool/
-pubspec.lock
+
+# Scripts (not needed by consumers)
+scripts/
+
+# Flutter example app (separate package, not part of the library)
+example/winget_catalog/

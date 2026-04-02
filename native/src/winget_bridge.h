@@ -63,13 +63,12 @@ WINGET_NC_API void wg_list_catalogs(int64_t handle, int64_t reply_port);
 /// {"done": true} when complete, or {"error": "..."} on failure.
 ///
 /// @param query  UTF-8 search string (name match)
-WINGET_NC_API void wg_search_name(int64_t handle, const char* query,
-                                  int64_t reply_port);
+WINGET_NC_API void wg_search_name(int64_t handle, const char* query, int64_t reply_port);
 
 /// Search for a package by exact ID.
 /// Posts {"package": {...}} or {"error": "..."} to reply_port.
 WINGET_NC_API void wg_find_by_id(int64_t handle, const char* package_id,
-                                 const char* catalog_id, // NULL = all catalogs
+                                 const char* catalog_id,  // NULL = all catalogs
                                  int64_t reply_port);
 
 // ---------------------------------------------------------------------------
@@ -88,13 +87,13 @@ WINGET_NC_API void wg_list_installed(int64_t handle, int64_t reply_port);
 /// Posts {"plan": {"installing": [...], "upgrading": [...], "removing": [...]}}
 /// or {"error": "..."} to reply_port.
 WINGET_NC_API void wg_simulate_install(int64_t handle, const char* package_id,
-                                       const char* catalog_id, // NULL = winget default
-                                       const char* version,    // NULL = latest
+                                       const char* catalog_id,  // NULL = winget default
+                                       const char* version,     // NULL = latest
                                        int64_t reply_port);
 
 /// Simulate upgrade (all packages or a specific one).
 WINGET_NC_API void wg_simulate_upgrade(int64_t handle,
-                                       const char* package_id, // NULL = all
+                                       const char* package_id,  // NULL = all
                                        int64_t reply_port);
 
 // ---------------------------------------------------------------------------
@@ -108,22 +107,18 @@ WINGET_NC_API void wg_simulate_upgrade(int64_t handle,
 /// @param silent             Install silently (no installer UI)
 /// @param accept_agreements  Auto-accept source/package agreements
 WINGET_NC_API void wg_install(int64_t handle, const char* package_id,
-                              const char* catalog_id,    // NULL = winget default
-                              const char* version,       // NULL = latest
-                              int32_t silent,
-                              int32_t accept_agreements,
-                              int64_t reply_port);
+                              const char* catalog_id,  // NULL = winget default
+                              const char* version,     // NULL = latest
+                              int32_t silent, int32_t accept_agreements, int64_t reply_port);
 
 /// Upgrade an installed package to the latest (or specified) version.
 WINGET_NC_API void wg_upgrade(int64_t handle, const char* package_id,
-                              const char* version, // NULL = latest
-                              int32_t silent,
-                              int32_t accept_agreements,
-                              int64_t reply_port);
+                              const char* version,  // NULL = latest
+                              int32_t silent, int32_t accept_agreements, int64_t reply_port);
 
 /// Uninstall an installed package.
-WINGET_NC_API void wg_uninstall(int64_t handle, const char* package_id,
-                                int32_t silent, int64_t reply_port);
+WINGET_NC_API void wg_uninstall(int64_t handle, const char* package_id, int32_t silent,
+                                int64_t reply_port);
 
 // ---------------------------------------------------------------------------
 // Updates check

@@ -1,0 +1,26 @@
+# Dart/Pub
+.dart_tool/
+.pub-cache/
+.pub/
+pubspec.lock
+**/doc/api/
+/coverage/
+
+# Build artifacts
+/build/
+build-tidy/
+_nuget/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -55,8 +55,8 @@ void main() {
         streamItems.add(p);
       }
       final resultItems = await tx.result;
-      expect(streamItems.map((p) => p.id),
-          equals(resultItems.map((p) => p.id)));
+      expect(
+          streamItems.map((p) => p.id), equals(resultItems.map((p) => p.id)));
     });
 
     test('error from bridge propagates to result future', () async {
@@ -105,8 +105,8 @@ void main() {
     });
 
     test('result future resolves after progress stream closes', () async {
-      fake.stubInstall('Pkg.A',
-          [Msg.progress(100, state: 'finished'), Msg.success]);
+      fake.stubInstall(
+          'Pkg.A', [Msg.progress(100, state: 'finished'), Msg.success]);
       final tx = client.installPackage('Pkg.A');
       await for (final _ in tx.progress) {}
       await tx.result; // completes without error

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
+#include <windows.h>
+
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -9,11 +11,9 @@
 #include <thread>
 #include <vector>
 
-#include <windows.h>
-
 #define WINRT_LEAN_AND_MEAN
-#include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.Management.Deployment.h>
+#include <winrt/Windows.Foundation.h>
 
 #include "dart/dart_api_dl.h"
 
@@ -51,26 +51,40 @@ class WgManager {
 
   bool IsRunning() const { return running_.load(std::memory_order_acquire); }
 
+  /// Returns true if the current process is running elevated (admin).
+  static bool IsElevated();
+
  private:
-  std::thread           apartment_thread_;
-  std::atomic<bool>     running_{false};
+  std::thread apartment_thread_;
+  std::atomic<bool> running_{false};
 
   // Startup synchronization: apartment thread signals ready via this CV.
-  std::mutex            start_mutex_;
+  std::mutex start_mutex_;
   std::condition_variable start_cv_;
-  int32_t               start_hresult_{0};
+  int32_t start_hresult_{0};
 
   // Task queue for Dispatch().
-  std::mutex            task_mutex_;
+  std::mutex task_mutex_;
   std::condition_variable task_cv_;
   std::vector<std::function<void()>> task_queue_;
 
   // Message pump HWND used to wake the thread via PostMessage.
-  HWND                  hwnd_{nullptr};
+  HWND hwnd_{nullptr};
 
   void ApartmentMain();
   static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-  static bool IsElevated();
 };
+
+/// Activate a WinGet COM class by runtime class name. Tries the in-process
+/// module from App Installer first, then the NuGet interop DLL, then
+/// CoCreateInstance. Works from unpackaged processes.
+template <typename T>
+T ActivateWinGetClass(std::wstring_view className);
+
+// Explicit instantiation declarations for types used across TUs.
+extern template PackageManager ActivateWinGetClass<PackageManager>(std::wstring_view);
+
+/// Clean up the in-process module loaded from App Installer.
+void ShutdownInProcModule();
 
 }  // namespace winget_nc

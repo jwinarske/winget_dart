@@ -6,21 +6,23 @@
 // Phase 3: install, upgrade, uninstall, simulate, get updates, cancel.
 
 #include "winget_bridge.h"
-#include "winget_manager.h"
-#include "winget_transaction.h"
-#include "message_codec.h"
+
+#include <objbase.h>
+#include <windows.h>
 
 #include <atomic>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
-#include <windows.h>
+#include "message_codec.h"
+#include "winget_manager.h"
+#include "winget_transaction.h"
 
 #define WINRT_LEAN_AND_MEAN
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.Management.Deployment.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.h>
 
 using namespace winrt::Microsoft::Management::Deployment;
 
@@ -67,12 +69,9 @@ void FreeHandle(int64_t handle) {
 
 // Helper: open a composite catalog across all sources and find a package by ID.
 // Returns the found CatalogPackage, or posts error and returns nullptr.
-static winrt::Windows::Foundation::IAsyncOperation<CatalogPackage>
-FindPackageInComposite(IPackageManager pm,
-                       const std::string& package_id,
-                       const std::string& catalog_id,
-                       winget_nc::WgTransaction* tx,
-                       Dart_Port port) {
+static winrt::Windows::Foundation::IAsyncOperation<CatalogPackage> FindPackageInComposite(
+    IPackageManager pm, const std::string& package_id, const std::string& catalog_id,
+    winget_nc::WgTransaction* tx, Dart_Port port) {
   using namespace winget_nc;
 
   PackageCatalog catalog{nullptr};
@@ -95,8 +94,7 @@ FindPackageInComposite(IPackageManager pm,
     for (auto const& ref : catalogs) {
       opts.Catalogs().Append(ref);
     }
-    opts.CompositeSearchBehavior(
-        CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+    opts.CompositeSearchBehavior(CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
     auto composite = pm.CreateCompositePackageCatalog(opts);
     auto connectResult = co_await composite.ConnectAsync();
     if (connectResult.Status() != ConnectResultStatus::Ok) {
@@ -142,7 +140,10 @@ static winrt::fire_and_forget DoListCatalogs(int64_t handle, Dart_Port port) {
     auto pm = g_manager->CreatePackageManager();
     auto catalogs = pm.GetPackageCatalogs();
     for (auto const& ref : catalogs) {
-      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      if (tx->cancelled) {
+        PostToDart(port, EncodeCancelled());
+        co_return;
+      }
       PostToDart(port, EncodeCatalog(ref.Info()));
     }
     PostToDart(port, EncodeDone());
@@ -151,9 +152,7 @@ static winrt::fire_and_forget DoListCatalogs(int64_t handle, Dart_Port port) {
   }
 }
 
-static winrt::fire_and_forget DoSearchName(int64_t handle,
-                                            std::string query,
-                                            Dart_Port port) {
+static winrt::fire_and_forget DoSearchName(int64_t handle, std::string query, Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -168,8 +167,7 @@ static winrt::fire_and_forget DoSearchName(int64_t handle,
     for (auto const& ref : catalogs) {
       opts.Catalogs().Append(ref);
     }
-    opts.CompositeSearchBehavior(
-        CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
+    opts.CompositeSearchBehavior(CompositeSearchBehavior::RemotePackagesFromAllCatalogs);
 
     auto composite = pm.CreateCompositePackageCatalog(opts);
     auto connectResult = co_await composite.ConnectAsync();
@@ -192,7 +190,10 @@ static winrt::fire_and_forget DoSearchName(int64_t handle,
     tx->current_op = nullptr;
 
     for (auto const& match : findResult.Matches()) {
-      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      if (tx->cancelled) {
+        PostToDart(port, EncodeCancelled());
+        co_return;
+      }
       PostToDart(port, EncodePackage(match.CatalogPackage(), "composite"));
     }
     PostToDart(port, EncodeDone());
@@ -202,10 +203,8 @@ static winrt::fire_and_forget DoSearchName(int64_t handle,
   }
 }
 
-static winrt::fire_and_forget DoFindById(int64_t handle,
-                                          std::string package_id,
-                                          std::string catalog_id,
-                                          Dart_Port port) {
+static winrt::fire_and_forget DoFindById(int64_t handle, std::string package_id,
+                                         std::string catalog_id, Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -214,11 +213,9 @@ static winrt::fire_and_forget DoFindById(int64_t handle,
   }
   try {
     auto pm = g_manager->CreatePackageManager();
-    auto pkg = co_await FindPackageInComposite(
-        pm, package_id, catalog_id, tx, port);
+    auto pkg = co_await FindPackageInComposite(pm, package_id, catalog_id, tx, port);
     if (pkg) {
-      PostToDart(port, EncodePackage(pkg,
-          catalog_id.empty() ? "composite" : catalog_id));
+      PostToDart(port, EncodePackage(pkg, catalog_id.empty() ? "composite" : catalog_id));
     }
     // FindPackageInComposite already posted error if not found.
   } catch (const winrt::hresult_error& e) {
@@ -236,8 +233,7 @@ static winrt::fire_and_forget DoListInstalled(int64_t handle, Dart_Port port) {
   try {
     auto pm = g_manager->CreatePackageManager();
 
-    auto localRef = pm.GetLocalPackageCatalog(
-        LocalPackageCatalog::InstalledPackages);
+    auto localRef = pm.GetLocalPackageCatalog(LocalPackageCatalog::InstalledPackages);
     auto connectResult = co_await localRef.ConnectAsync();
     if (connectResult.Status() != ConnectResultStatus::Ok) {
       PostToDart(port, EncodeError("Local catalog connect failed", 0));
@@ -252,7 +248,10 @@ static winrt::fire_and_forget DoListInstalled(int64_t handle, Dart_Port port) {
     tx->current_op = nullptr;
 
     for (auto const& match : findResult.Matches()) {
-      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      if (tx->cancelled) {
+        PostToDart(port, EncodeCancelled());
+        co_return;
+      }
       PostToDart(port, EncodePackage(match.CatalogPackage(), "local"));
     }
     PostToDart(port, EncodeDone());
@@ -266,12 +265,9 @@ static winrt::fire_and_forget DoListInstalled(int64_t handle, Dart_Port port) {
 // Mutating operation coroutines (Phase 3)
 // ===========================================================================
 
-static winrt::fire_and_forget DoSimulateInstall(
-    int64_t handle,
-    std::string package_id,
-    std::string catalog_id,
-    std::string version,
-    Dart_Port port) {
+static winrt::fire_and_forget DoSimulateInstall(int64_t handle, std::string package_id,
+                                                std::string catalog_id, std::string version,
+                                                Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -280,8 +276,7 @@ static winrt::fire_and_forget DoSimulateInstall(
   }
   try {
     auto pm = g_manager->CreatePackageManager();
-    auto pkg = co_await FindPackageInComposite(
-        pm, package_id, catalog_id, tx, port);
+    auto pkg = co_await FindPackageInComposite(pm, package_id, catalog_id, tx, port);
     if (!pkg) co_return;  // Error already posted.
 
     // Simulate: the WinGet COM API doesn't have a dedicated dependency
@@ -290,18 +285,15 @@ static winrt::fire_and_forget DoSimulateInstall(
     InstallPlan plan;
     plan.installing.push_back(pkg);
 
-    PostToDart(port, EncodePlan(plan,
-        catalog_id.empty() ? "composite" : catalog_id));
+    PostToDart(port, EncodePlan(plan, catalog_id.empty() ? "composite" : catalog_id));
 
   } catch (const winrt::hresult_error& e) {
     PostToDart(port, EncodeWinrtError(e));
   }
 }
 
-static winrt::fire_and_forget DoSimulateUpgrade(
-    int64_t handle,
-    std::string package_id,
-    Dart_Port port) {
+static winrt::fire_and_forget DoSimulateUpgrade(int64_t handle, std::string package_id,
+                                                Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -313,8 +305,7 @@ static winrt::fire_and_forget DoSimulateUpgrade(
 
     if (!package_id.empty()) {
       // Simulate upgrade for a specific package.
-      auto pkg = co_await FindPackageInComposite(
-          pm, package_id, "", tx, port);
+      auto pkg = co_await FindPackageInComposite(pm, package_id, "", tx, port);
       if (!pkg) co_return;
 
       InstallPlan plan;
@@ -325,8 +316,7 @@ static winrt::fire_and_forget DoSimulateUpgrade(
       // List available upgrades first, then resolve deps for each.
       InstallPlan plan;
 
-      auto localRef = pm.GetLocalPackageCatalog(
-          LocalPackageCatalog::InstalledPackages);
+      auto localRef = pm.GetLocalPackageCatalog(LocalPackageCatalog::InstalledPackages);
       auto connectResult = co_await localRef.ConnectAsync();
       if (connectResult.Status() != ConnectResultStatus::Ok) {
         PostToDart(port, EncodeError("Local catalog connect failed", 0));
@@ -341,7 +331,10 @@ static winrt::fire_and_forget DoSimulateUpgrade(
       tx->current_op = nullptr;
 
       for (auto const& match : findResult.Matches()) {
-        if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+        if (tx->cancelled) {
+          PostToDart(port, EncodeCancelled());
+          co_return;
+        }
         auto pkg = match.CatalogPackage();
         if (pkg.IsUpdateAvailable()) {
           plan.upgrading.push_back(pkg);
@@ -355,14 +348,9 @@ static winrt::fire_and_forget DoSimulateUpgrade(
   }
 }
 
-static winrt::fire_and_forget DoInstall(
-    int64_t handle,
-    std::string package_id,
-    std::string catalog_id,
-    std::string version,
-    bool silent,
-    bool accept_agreements,
-    Dart_Port port) {
+static winrt::fire_and_forget DoInstall(int64_t handle, std::string package_id,
+                                        std::string catalog_id, std::string version, bool silent,
+                                        bool accept_agreements, Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -372,15 +360,13 @@ static winrt::fire_and_forget DoInstall(
 
   // Sequential install guard.
   if (!tx->TryStartMutatingOp()) {
-    PostToDart(port, EncodeError(
-        "Another install/upgrade/uninstall is already in progress", 0));
+    PostToDart(port, EncodeError("Another install/upgrade/uninstall is already in progress", 0));
     co_return;
   }
 
   try {
     auto pm = g_manager->CreatePackageManager();
-    auto pkg = co_await FindPackageInComposite(
-        pm, package_id, catalog_id, tx, port);
+    auto pkg = co_await FindPackageInComposite(pm, package_id, catalog_id, tx, port);
     if (!pkg) {
       tx->EndMutatingOp();
       co_return;
@@ -413,9 +399,8 @@ static winrt::fire_and_forget DoInstall(
     if (result.Status() == InstallResultStatus::Ok) {
       PostToDart(port, EncodeSuccess());
     } else {
-      PostToDart(port, EncodeError(
-          "Install failed",
-          static_cast<int32_t>(result.ExtendedErrorCode())));
+      PostToDart(port,
+                 EncodeError("Install failed", static_cast<int32_t>(result.ExtendedErrorCode())));
     }
 
   } catch (const winrt::hresult_error& e) {
@@ -424,13 +409,8 @@ static winrt::fire_and_forget DoInstall(
   }
 }
 
-static winrt::fire_and_forget DoUpgrade(
-    int64_t handle,
-    std::string package_id,
-    std::string version,
-    bool silent,
-    bool accept_agreements,
-    Dart_Port port) {
+static winrt::fire_and_forget DoUpgrade(int64_t handle, std::string package_id, std::string version,
+                                        bool silent, bool accept_agreements, Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -439,15 +419,13 @@ static winrt::fire_and_forget DoUpgrade(
   }
 
   if (!tx->TryStartMutatingOp()) {
-    PostToDart(port, EncodeError(
-        "Another install/upgrade/uninstall is already in progress", 0));
+    PostToDart(port, EncodeError("Another install/upgrade/uninstall is already in progress", 0));
     co_return;
   }
 
   try {
     auto pm = g_manager->CreatePackageManager();
-    auto pkg = co_await FindPackageInComposite(
-        pm, package_id, "", tx, port);
+    auto pkg = co_await FindPackageInComposite(pm, package_id, "", tx, port);
     if (!pkg) {
       tx->EndMutatingOp();
       co_return;
@@ -475,8 +453,8 @@ static winrt::fire_and_forget DoUpgrade(
     if (result.Status() == InstallResultStatus::Ok) {
       PostToDart(port, EncodeSuccess());
     } else {
-      PostToDart(port, EncodeError("Upgrade failed",
-          static_cast<int32_t>(result.ExtendedErrorCode())));
+      PostToDart(port,
+                 EncodeError("Upgrade failed", static_cast<int32_t>(result.ExtendedErrorCode())));
     }
 
   } catch (const winrt::hresult_error& e) {
@@ -485,11 +463,8 @@ static winrt::fire_and_forget DoUpgrade(
   }
 }
 
-static winrt::fire_and_forget DoUninstall(
-    int64_t handle,
-    std::string package_id,
-    bool silent,
-    Dart_Port port) {
+static winrt::fire_and_forget DoUninstall(int64_t handle, std::string package_id, bool silent,
+                                          Dart_Port port) {
   using namespace winget_nc;
   auto* tx = LookupHandle(handle);
   if (!tx || tx->cancelled) {
@@ -498,8 +473,7 @@ static winrt::fire_and_forget DoUninstall(
   }
 
   if (!tx->TryStartMutatingOp()) {
-    PostToDart(port, EncodeError(
-        "Another install/upgrade/uninstall is already in progress", 0));
+    PostToDart(port, EncodeError("Another install/upgrade/uninstall is already in progress", 0));
     co_return;
   }
 
@@ -507,8 +481,7 @@ static winrt::fire_and_forget DoUninstall(
     auto pm = g_manager->CreatePackageManager();
 
     // Find the package in the local installed catalog.
-    auto localRef = pm.GetLocalPackageCatalog(
-        LocalPackageCatalog::InstalledPackages);
+    auto localRef = pm.GetLocalPackageCatalog(LocalPackageCatalog::InstalledPackages);
     auto connectResult = co_await localRef.ConnectAsync();
     if (connectResult.Status() != ConnectResultStatus::Ok) {
       tx->EndMutatingOp();
@@ -532,8 +505,7 @@ static winrt::fire_and_forget DoUninstall(
     auto matches = findResult.Matches();
     if (matches.Size() == 0) {
       tx->EndMutatingOp();
-      PostToDart(port, EncodeError(
-          "Package not installed: " + package_id, 0));
+      PostToDart(port, EncodeError("Package not installed: " + package_id, 0));
       co_return;
     }
     auto pkg = matches.GetAt(0).CatalogPackage();
@@ -557,8 +529,8 @@ static winrt::fire_and_forget DoUninstall(
     if (result.Status() == UninstallResultStatus::Ok) {
       PostToDart(port, EncodeSuccess());
     } else {
-      PostToDart(port, EncodeError("Uninstall failed",
-          static_cast<int32_t>(result.ExtendedErrorCode())));
+      PostToDart(port,
+                 EncodeError("Uninstall failed", static_cast<int32_t>(result.ExtendedErrorCode())));
     }
 
   } catch (const winrt::hresult_error& e) {
@@ -583,8 +555,7 @@ static winrt::fire_and_forget DoGetUpdates(int64_t handle, Dart_Port port) {
     for (auto const& ref : catalogs) {
       opts.Catalogs().Append(ref);
     }
-    opts.CompositeSearchBehavior(
-        CompositeSearchBehavior::LocalCatalogs);
+    opts.CompositeSearchBehavior(CompositeSearchBehavior::LocalCatalogs);
 
     auto composite = pm.CreateCompositePackageCatalog(opts);
     auto connectResult = co_await composite.ConnectAsync();
@@ -601,7 +572,10 @@ static winrt::fire_and_forget DoGetUpdates(int64_t handle, Dart_Port port) {
     tx->current_op = nullptr;
 
     for (auto const& match : findResult.Matches()) {
-      if (tx->cancelled) { PostToDart(port, EncodeCancelled()); co_return; }
+      if (tx->cancelled) {
+        PostToDart(port, EncodeCancelled());
+        co_return;
+      }
       auto pkg = match.CatalogPackage();
       if (pkg.IsUpdateAvailable()) {
         PostToDart(port, EncodePackage(pkg, "composite", true));
@@ -645,9 +619,20 @@ extern "C" int32_t wg_init(void* post_c_object) {
 // ---------------------------------------------------------------------------
 extern "C" int32_t wg_is_available(void) {
   try {
-    winrt::get_activation_factory<PackageManager>();
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+  } catch (const winrt::hresult_error&) {
+    // Already initialized on this thread — that's fine.
+  }
+  try {
+    auto pm = winget_nc::ActivateWinGetClass<PackageManager>(
+        L"Microsoft.Management.Deployment.PackageManager");
     return 1;
+  } catch (const winrt::hresult_error& e) {
+    fprintf(stderr, "wg_is_available: HRESULT=0x%08X msg=%ls\n", static_cast<unsigned>(e.code()),
+            e.message().c_str());
+    return 0;
   } catch (...) {
+    fprintf(stderr, "wg_is_available: unknown exception\n");
     return 0;
   }
 }
@@ -676,9 +661,7 @@ extern "C" int64_t wg_connect(int64_t reply_port) {
   return handle;
 }
 
-extern "C" void wg_disconnect(int64_t handle) {
-  FreeHandle(handle);
-}
+extern "C" void wg_disconnect(int64_t handle) { FreeHandle(handle); }
 
 // ---------------------------------------------------------------------------
 // wg_list_catalogs
@@ -693,9 +676,8 @@ extern "C" void wg_list_catalogs(int64_t handle, int64_t reply_port) {
 // ---------------------------------------------------------------------------
 // wg_search_name
 // ---------------------------------------------------------------------------
-extern "C" void wg_search_name(int64_t handle, const char* query_utf8,
-                                int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_search_name(int64_t handle, const char* query_utf8, int64_t reply_port) {
+  if (!g_manager || !query_utf8) return;
   std::string query(query_utf8);
   g_manager->Dispatch([handle, query, reply_port]() noexcept {
     DoSearchName(handle, query, static_cast<Dart_Port>(reply_port));
@@ -705,9 +687,9 @@ extern "C" void wg_search_name(int64_t handle, const char* query_utf8,
 // ---------------------------------------------------------------------------
 // wg_find_by_id
 // ---------------------------------------------------------------------------
-extern "C" void wg_find_by_id(int64_t handle, const char* package_id,
-                               const char* catalog_id, int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_find_by_id(int64_t handle, const char* package_id, const char* catalog_id,
+                              int64_t reply_port) {
+  if (!g_manager || !package_id) return;
   std::string pid(package_id);
   std::string cid(catalog_id ? catalog_id : "");
   g_manager->Dispatch([handle, pid, cid, reply_port]() noexcept {
@@ -728,25 +710,21 @@ extern "C" void wg_list_installed(int64_t handle, int64_t reply_port) {
 // ---------------------------------------------------------------------------
 // wg_simulate_install
 // ---------------------------------------------------------------------------
-extern "C" void wg_simulate_install(int64_t handle, const char* package_id,
-                                     const char* catalog_id,
-                                     const char* version,
-                                     int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_simulate_install(int64_t handle, const char* package_id, const char* catalog_id,
+                                    const char* version, int64_t reply_port) {
+  if (!g_manager || !package_id) return;
   std::string pid(package_id);
   std::string cid(catalog_id ? catalog_id : "");
   std::string ver(version ? version : "");
   g_manager->Dispatch([handle, pid, cid, ver, reply_port]() noexcept {
-    DoSimulateInstall(handle, pid, cid, ver,
-                      static_cast<Dart_Port>(reply_port));
+    DoSimulateInstall(handle, pid, cid, ver, static_cast<Dart_Port>(reply_port));
   });
 }
 
 // ---------------------------------------------------------------------------
 // wg_simulate_upgrade
 // ---------------------------------------------------------------------------
-extern "C" void wg_simulate_upgrade(int64_t handle, const char* package_id,
-                                     int64_t reply_port) {
+extern "C" void wg_simulate_upgrade(int64_t handle, const char* package_id, int64_t reply_port) {
   if (!g_manager) return;
   std::string pid(package_id ? package_id : "");
   g_manager->Dispatch([handle, pid, reply_port]() noexcept {
@@ -757,45 +735,41 @@ extern "C" void wg_simulate_upgrade(int64_t handle, const char* package_id,
 // ---------------------------------------------------------------------------
 // wg_install
 // ---------------------------------------------------------------------------
-extern "C" void wg_install(int64_t handle, const char* package_id,
-                            const char* catalog_id, const char* version,
-                            int32_t silent, int32_t accept_agreements,
-                            int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_install(int64_t handle, const char* package_id, const char* catalog_id,
+                           const char* version, int32_t silent, int32_t accept_agreements,
+                           int64_t reply_port) {
+  if (!g_manager || !package_id) return;
   std::string pid(package_id);
   std::string cid(catalog_id ? catalog_id : "");
   std::string ver(version ? version : "");
   bool sil = (silent != 0);
   bool acc = (accept_agreements != 0);
   g_manager->Dispatch([handle, pid, cid, ver, sil, acc, reply_port]() noexcept {
-    DoInstall(handle, pid, cid, ver, sil, acc,
-              static_cast<Dart_Port>(reply_port));
+    DoInstall(handle, pid, cid, ver, sil, acc, static_cast<Dart_Port>(reply_port));
   });
 }
 
 // ---------------------------------------------------------------------------
 // wg_upgrade
 // ---------------------------------------------------------------------------
-extern "C" void wg_upgrade(int64_t handle, const char* package_id,
-                            const char* version, int32_t silent,
-                            int32_t accept_agreements, int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_upgrade(int64_t handle, const char* package_id, const char* version,
+                           int32_t silent, int32_t accept_agreements, int64_t reply_port) {
+  if (!g_manager || !package_id) return;
   std::string pid(package_id);
   std::string ver(version ? version : "");
   bool sil = (silent != 0);
   bool acc = (accept_agreements != 0);
   g_manager->Dispatch([handle, pid, ver, sil, acc, reply_port]() noexcept {
-    DoUpgrade(handle, pid, ver, sil, acc,
-              static_cast<Dart_Port>(reply_port));
+    DoUpgrade(handle, pid, ver, sil, acc, static_cast<Dart_Port>(reply_port));
   });
 }
 
 // ---------------------------------------------------------------------------
 // wg_uninstall
 // ---------------------------------------------------------------------------
-extern "C" void wg_uninstall(int64_t handle, const char* package_id,
-                              int32_t silent, int64_t reply_port) {
-  if (!g_manager) return;
+extern "C" void wg_uninstall(int64_t handle, const char* package_id, int32_t silent,
+                             int64_t reply_port) {
+  if (!g_manager || !package_id) return;
   std::string pid(package_id);
   bool sil = (silent != 0);
   g_manager->Dispatch([handle, pid, sil, reply_port]() noexcept {
