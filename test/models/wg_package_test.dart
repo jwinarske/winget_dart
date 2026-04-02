@@ -39,5 +39,10 @@ void main() {
       final p = WgPackage.fromJson({...base, 'catalog': null});
       expect(p.catalogId, equals(''));
     });
+
+    test('toString includes id and version', () {
+      final p = WgPackage.fromJson(base);
+      expect(p.toString(), equals('WgPackage(Kitware.CMake 3.28.0)'));
+    });
   });
 }

@@ -1,3 +1,33 @@
+## 0.2.0
+
+### Features
+
+- Unpackaged COM activation for non-MSIX (desktop/console) apps
+- Microsoft.Management.Deployment interop DLL bundling for x64 and ARM64
+- Flutter example app (`example/winget_catalog`) with Fluent UI, Riverpod,
+  and live WinGet integration (search, install, upgrade, uninstall, updates)
+- README badges for pub.dev, CI status, Codecov, and license
+- Screenshot of Flutter example in README
+
+### CI & quality
+
+- Codecov integration with `CODECOV_TOKEN`, `fail_ci_if_error`, and
+  `codecov.yml` for server-side generated-file exclusion
+- Coverage threshold enforcement at 60% in CI
+- `--report-on=lib` and generated-file filtering in lcov pipeline
+- `.pubignore` to exclude build artifacts and Flutter example from published package
+- `.gitignore` at project root
+- Exclude Flutter example from root `dart analyze` scope
+- Unit test coverage improved from 89.6% to 97.2%: added tests for
+  retry backoff, negative connect handle, listCatalogs/simulateInstall errors,
+  cancel, streaming cancelled/error paths, model `toString()` methods,
+  and `MessageDecoder.messageToString` unexpected type
+
+### Breaking changes
+
+- `FakeWingetBridge.stubIsAvailableFn` added; internal `_available` field
+  changed from `bool` to `bool Function()` (no public API impact)
+
 ## 0.1.0
 
 Initial release.

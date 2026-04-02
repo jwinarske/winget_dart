@@ -31,6 +31,12 @@ void main() {
     });
   });
 
+  group('MessageDecoder.messageToString', () {
+    test('throws FormatException for unexpected type', () {
+      expect(() => MessageDecoder.messageToString(42), throwsFormatException);
+    });
+  });
+
   group('MessageDecoder.discriminator', () {
     const knownKeys = [
       'pkg',
