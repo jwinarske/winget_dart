@@ -21,6 +21,25 @@ void main() {
         ..stubConnect(ok: false, errorMessage: 'COM failure', hresult: -1);
       expect(WgClient.connect(fake), throwsA(isA<WgException>()));
     });
+
+    test('retries when initially unavailable then succeeds', () async {
+      var callCount = 0;
+      final fake = FakeWingetBridge()
+        ..stubIsAvailableFn(() => ++callCount >= 2);
+      final client = await WgClient.connect(
+        fake,
+        maxRetries: 2,
+        retryDelay: const Duration(milliseconds: 1),
+      );
+      addTearDown(client.close);
+      expect(client, isNotNull);
+      expect(callCount, greaterThanOrEqualTo(2));
+    });
+
+    test('throws WgException for negative connect handle', () {
+      final fake = FakeWingetBridge()..stubConnect(handle: -1);
+      expect(WgClient.connect(fake), throwsA(isA<WgException>()));
+    });
   });
 
   group('WgClient.listCatalogs', () {
@@ -45,6 +64,14 @@ void main() {
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
       expect(await client.listCatalogs(), isEmpty);
+    });
+
+    test('throws WgException on error', () async {
+      final fake = FakeWingetBridge()
+        ..stubCatalogs([Msg.error('catalog error')]);
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+      expect(client.listCatalogs(), throwsA(isA<WgException>()));
     });
   });
 
@@ -112,6 +139,14 @@ void main() {
       final plan = await client.simulateInstall('Already.Installed');
       expect(plan.isEmpty, isTrue);
     });
+
+    test('throws WgException on error', () async {
+      final fake = FakeWingetBridge()
+        ..stubSimulateInstall('Bad.Pkg', Msg.error('simulate failed'));
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+      expect(client.simulateInstall('Bad.Pkg'), throwsA(isA<WgException>()));
+    });
   });
 
   group('WgClient.installPackage', () {
@@ -168,6 +203,56 @@ void main() {
       final packages = await client.listInstalled().result;
       expect(packages, hasLength(1));
       expect(packages.first.source, equals('local'));
+    });
+  });
+
+  group('WgClient.cancel', () {
+    test('calls bridge cancel', () async {
+      final fake = FakeWingetBridge();
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+      // Should not throw.
+      client.cancel();
+    });
+  });
+
+  group('WgClient streaming error paths', () {
+    test('searchName propagates cancelled to result', () async {
+      final fake = FakeWingetBridge()..stubSearchName('x', [Msg.cancelled]);
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+
+      final tx = client.searchName('x');
+      expect(tx.result, throwsA(isA<WgCancelledException>()));
+    });
+
+    test('searchName propagates error to result', () async {
+      final fake = FakeWingetBridge()
+        ..stubSearchName('x', [Msg.error('search failed')]);
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+
+      final tx = client.searchName('x');
+      expect(tx.result, throwsA(isA<WgException>()));
+    });
+
+    test('installPackage propagates cancelled to result', () async {
+      final fake = FakeWingetBridge()..stubInstall('Pkg.C', [Msg.cancelled]);
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+
+      final tx = client.installPackage('Pkg.C');
+      expect(tx.result, throwsA(isA<WgCancelledException>()));
+    });
+
+    test('installPackage propagates error to result', () async {
+      final fake = FakeWingetBridge()
+        ..stubInstall('Pkg.D', [Msg.error('install failed')]);
+      final client = await WgClient.connect(fake);
+      addTearDown(client.close);
+
+      final tx = client.installPackage('Pkg.D');
+      expect(tx.result, throwsA(isA<WgException>()));
     });
   });
 

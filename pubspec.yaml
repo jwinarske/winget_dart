@@ -4,7 +4,7 @@ description: >-
   Microsoft.Management.Deployment COM/WinRT interface. Supports search,
   install, upgrade, uninstall, and simulate operations with async progress
   streams. Targets Windows x64 and ARM64.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/jwinarske/winget_dart
 issue_tracker: https://github.com/jwinarske/winget_dart/issues
 

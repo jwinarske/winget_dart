@@ -43,8 +43,7 @@ void main(List<String> args) async {
         .hashCode
         .toUnsigned(32)
         .toRadixString(16);
-    final buildDir = Directory(
-        '${Platform.environment['TEMP'] ?? r'C:\Temp'}'
+    final buildDir = Directory('${Platform.environment['TEMP'] ?? r'C:\Temp'}'
         r'\wg_nc_'
         '$outputHash'
         '_$targetArch');

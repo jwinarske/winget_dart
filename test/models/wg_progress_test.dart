@@ -45,5 +45,12 @@ void main() {
       final p = WgProgress.fromJson({'percent': 10, 'state': null});
       expect(p.state, equals(WgInstallState.unknown));
     });
+
+    test('toString includes percent and state', () {
+      final p = WgProgress(
+          percent: 50, state: WgInstallState.downloading, label: 'dl');
+      expect(
+          p.toString(), equals('WgProgress(50% WgInstallState.downloading)'));
+    });
   });
 }

@@ -51,7 +51,7 @@ abstract final class Msg {
 
 /// Scriptable [WingetBridge] for unit testing.
 final class FakeWingetBridge implements WingetBridge {
-  bool _available = true;
+  bool Function() _availableFn = () => true;
   int _initResult = 0;
   int _connectHandle = 1;
   bool _connectOk = true;
@@ -62,7 +62,12 @@ final class FakeWingetBridge implements WingetBridge {
 
   // Stub configuration
   FakeWingetBridge stubIsAvailable(bool v) {
-    _available = v;
+    _availableFn = () => v;
+    return this;
+  }
+
+  FakeWingetBridge stubIsAvailableFn(bool Function() fn) {
+    _availableFn = fn;
     return this;
   }
 
@@ -132,7 +137,7 @@ final class FakeWingetBridge implements WingetBridge {
   // WingetBridge implementation
 
   @override
-  bool isAvailable() => _available;
+  bool isAvailable() => _availableFn();
 
   @override
   void init() {
