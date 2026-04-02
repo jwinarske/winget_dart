@@ -1,3 +1,8 @@
+[![pub package](https://img.shields.io/pub/v/winget_dart.svg)](https://pub.dev/packages/winget_dart)
+[![CI](https://github.com/jwinarske/winget_dart/actions/workflows/ci.yml/badge.svg)](https://github.com/jwinarske/winget_dart/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/jwinarske/winget_dart/branch/main/graph/badge.svg)](https://codecov.io/gh/jwinarske/winget_dart)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 # winget_dart
 
 Typed Dart API for the [Windows Package Manager](https://github.com/microsoft/winget-cli)
@@ -166,6 +171,10 @@ winget_bridge.h  (flat C ABI -- Windows x64 and ARM64)
         v
   WinGet catalogs  (winget community repo, msstore, ...)
 ```
+
+## Flutter example
+
+![Flutter WinGet Catalog example](doc/flutter_example_01.png)
 
 ## Building the native library manually
 

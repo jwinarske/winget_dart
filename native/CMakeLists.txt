@@ -59,6 +59,7 @@ target_link_libraries(winget_nc PRIVATE
   ole32         # CoCreateInstance
   oleaut32
   runtimeobject # RoActivateInstance, RoGetActivationFactory
+  wintrust      # WinVerifyTrust (Authenticode signature verification)
 )
 
 # WinGet COM activation uses RoActivateInstance at runtime — no import lib
@@ -100,3 +101,11 @@ endif()
 install(TARGETS winget_nc
   RUNTIME DESTINATION bin
 )
+
+# Install the WinGet COM interop DLL alongside winget_nc.dll.
+# The build hook sets WINGET_INTEROP_DLL to the path of
+# Microsoft.Management.Deployment.dll from the NuGet package.
+if(DEFINED WINGET_INTEROP_DLL AND EXISTS "${WINGET_INTEROP_DLL}")
+  install(FILES "${WINGET_INTEROP_DLL}" DESTINATION bin)
+  message(STATUS "winget_nc: will install interop DLL from ${WINGET_INTEROP_DLL}")
+endif()

@@ -20,7 +20,8 @@ void main() {
     test('maps unknown string to unknown', () {
       expect(WgInstallState.from(''), equals(WgInstallState.unknown));
       expect(WgInstallState.from('garbage'), equals(WgInstallState.unknown));
-      expect(WgInstallState.from('DOWNLOADING'), equals(WgInstallState.unknown));
+      expect(
+          WgInstallState.from('DOWNLOADING'), equals(WgInstallState.unknown));
     });
   });
 

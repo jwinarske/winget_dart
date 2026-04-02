@@ -143,9 +143,11 @@ final class FakeWingetBridge implements WingetBridge {
 
   @override
   int connect(SendPort reply) {
-    _post(reply, _connectOk
-        ? Msg.ok
-        : Msg.error(_connectError, hresult: _connectHresult));
+    _post(
+        reply,
+        _connectOk
+            ? Msg.ok
+            : Msg.error(_connectError, hresult: _connectHresult));
     return _connectHandle;
   }
 
@@ -164,10 +166,10 @@ final class FakeWingetBridge implements WingetBridge {
       _postAll(reply, _responses['searchName:$query'] ?? [Msg.done]);
 
   @override
-  void findById(int handle, String packageId, String? catalogId,
-          SendPort reply) =>
-      _postAll(reply,
-          _responses['findById:$packageId'] ?? [Msg.error('Not found')]);
+  void findById(
+          int handle, String packageId, String? catalogId, SendPort reply) =>
+      _postAll(
+          reply, _responses['findById:$packageId'] ?? [Msg.error('Not found')]);
 
   @override
   void listInstalled(int handle, SendPort reply) =>
@@ -180,30 +182,26 @@ final class FakeWingetBridge implements WingetBridge {
   @override
   void simulateInstall(int handle, String packageId, String? catalogId,
           String? version, SendPort reply) =>
-      _postAll(reply,
-          _responses['simulateInstall:$packageId'] ?? [Msg.plan()]);
+      _postAll(reply, _responses['simulateInstall:$packageId'] ?? [Msg.plan()]);
 
   @override
   void simulateUpgrade(int handle, String? packageId, SendPort reply) =>
-      _postAll(reply, _responses['simulateUpgrade:${packageId ?? '*'}'] ??
-          [Msg.plan()]);
+      _postAll(reply,
+          _responses['simulateUpgrade:${packageId ?? '*'}'] ?? [Msg.plan()]);
 
   @override
-  void install(int handle, String packageId, String? catalogId,
-          String? version, bool silent, SendPort reply) =>
-      _postAll(
-          reply, _responses['install:$packageId'] ?? [Msg.success]);
+  void install(int handle, String packageId, String? catalogId, String? version,
+          bool silent, SendPort reply) =>
+      _postAll(reply, _responses['install:$packageId'] ?? [Msg.success]);
 
   @override
   void upgrade(int handle, String packageId, String? version, bool silent,
           SendPort reply) =>
-      _postAll(
-          reply, _responses['upgrade:$packageId'] ?? [Msg.success]);
+      _postAll(reply, _responses['upgrade:$packageId'] ?? [Msg.success]);
 
   @override
   void uninstall(int handle, String packageId, bool silent, SendPort reply) =>
-      _postAll(
-          reply, _responses['uninstall:$packageId'] ?? [Msg.success]);
+      _postAll(reply, _responses['uninstall:$packageId'] ?? [Msg.success]);
 
   // Delivery helpers
 

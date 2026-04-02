@@ -16,7 +16,7 @@ final class NativeWingetBridge implements WingetBridge {
 
   @override
   void init() {
-    final result = ffi.wgInit(NativeApi.postCObject.cast());
+    final result = ffi.wgInit(NativeApi.initializeApiDLData);
     if (result != 0) {
       throw Exception(
           'wg_init failed with HRESULT 0x${result.toRadixString(16)}');
@@ -79,8 +79,8 @@ final class NativeWingetBridge implements WingetBridge {
           ));
 
   @override
-  void install(int handle, String packageId, String? catalogId,
-          String? version, bool silent, SendPort reply) =>
+  void install(int handle, String packageId, String? catalogId, String? version,
+          bool silent, SendPort reply) =>
       using((a) => ffi.wgInstall(
             handle,
             packageId.toNativeUtf8(allocator: a).cast(),

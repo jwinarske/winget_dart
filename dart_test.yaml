@@ -1,5 +1,5 @@
 tags:
   integration:
     # Integration tests require a live Windows environment with WinGet.
-    # Run with: dart test --tags=integration
-    # Skipped by default in: dart test --exclude-tags=integration
+    # Run explicitly with: dart test --tags=integration --run-skipped
+    skip: "Requires live Windows + WinGet (run with --tags=integration --run-skipped)"

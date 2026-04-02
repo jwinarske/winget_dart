@@ -9,13 +9,10 @@
 // ignore_for_file: avoid_positional_boolean_parameters
 // ignore_for_file: non_constant_identifier_names
 
-import 'dart:ffi' as ffi;
-
-// ---------------------------------------------------------------------------
-// Default asset — resolved by the Build Hook CodeAsset at runtime.
-// ---------------------------------------------------------------------------
 @ffi.DefaultAsset('package:winget_dart/src/winget_nc.dart')
 library;
+
+import 'dart:ffi' as ffi;
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -48,8 +45,7 @@ external int wgIsAvailable();
 
 /// List all configured package catalogs.
 /// Posts catalog JSON objects to replyPort, then {"done": true}.
-@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Int64)>(
-    symbol: 'wg_list_catalogs')
+@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Int64)>(symbol: 'wg_list_catalogs')
 external void wgListCatalogs(int handle, int replyPort);
 
 // ---------------------------------------------------------------------------
@@ -58,8 +54,7 @@ external void wgListCatalogs(int handle, int replyPort);
 
 /// Search for packages by name across all catalogs.
 /// Posts package JSON objects to replyPort, then {"done": true}.
-@ffi.Native<
-    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int64)>(
+@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int64)>(
     symbol: 'wg_search_name')
 external void wgSearchName(
     int handle, ffi.Pointer<ffi.Char> query, int replyPort);
@@ -67,9 +62,8 @@ external void wgSearchName(
 /// Search for a package by exact ID.
 /// Posts {"pkg": {...}} or {"error": "..."} to replyPort.
 @ffi.Native<
-    ffi.Void Function(
-        ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Int64)>(
-    symbol: 'wg_find_by_id')
+    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
+        ffi.Int64)>(symbol: 'wg_find_by_id')
 external void wgFindById(int handle, ffi.Pointer<ffi.Char> packageId,
     ffi.Pointer<ffi.Char> catalogId, int replyPort);
 
@@ -90,9 +84,8 @@ external void wgListInstalled(int handle, int replyPort);
 /// Simulate install — resolve dependencies without installing.
 /// Posts {"plan": {...}} or {"error": "..."} to replyPort.
 @ffi.Native<
-    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>,
-        ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Int64)>(
-    symbol: 'wg_simulate_install')
+    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>, ffi.Int64)>(symbol: 'wg_simulate_install')
 external void wgSimulateInstall(
     int handle,
     ffi.Pointer<ffi.Char> packageId,
@@ -101,8 +94,7 @@ external void wgSimulateInstall(
     int replyPort);
 
 /// Simulate upgrade (all packages or a specific one).
-@ffi.Native<
-    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int64)>(
+@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int64)>(
     symbol: 'wg_simulate_upgrade')
 external void wgSimulateUpgrade(
     int handle, ffi.Pointer<ffi.Char> packageId, int replyPort);
@@ -113,8 +105,13 @@ external void wgSimulateUpgrade(
 
 /// Install a package with progress events.
 @ffi.Native<
-    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>,
-        ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Int32, ffi.Int32,
+    ffi.Void Function(
+        ffi.Int64,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Pointer<ffi.Char>,
+        ffi.Int32,
+        ffi.Int32,
         ffi.Int64)>(symbol: 'wg_install')
 external void wgInstall(
     int handle,
@@ -127,9 +124,8 @@ external void wgInstall(
 
 /// Upgrade an installed package with progress events.
 @ffi.Native<
-    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>,
-        ffi.Pointer<ffi.Char>, ffi.Int32, ffi.Int32, ffi.Int64)>(
-    symbol: 'wg_upgrade')
+    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
+        ffi.Int32, ffi.Int32, ffi.Int64)>(symbol: 'wg_upgrade')
 external void wgUpgrade(
     int handle,
     ffi.Pointer<ffi.Char> packageId,
@@ -140,9 +136,8 @@ external void wgUpgrade(
 
 /// Uninstall an installed package.
 @ffi.Native<
-    ffi.Void Function(
-        ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int32, ffi.Int64)>(
-    symbol: 'wg_uninstall')
+    ffi.Void Function(ffi.Int64, ffi.Pointer<ffi.Char>, ffi.Int32,
+        ffi.Int64)>(symbol: 'wg_uninstall')
 external void wgUninstall(
     int handle, ffi.Pointer<ffi.Char> packageId, int silent, int replyPort);
 
@@ -152,8 +147,7 @@ external void wgUninstall(
 
 /// List packages that have available upgrades.
 /// Posts package JSON objects to replyPort, then {"done": true}.
-@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Int64)>(
-    symbol: 'wg_get_updates')
+@ffi.Native<ffi.Void Function(ffi.Int64, ffi.Int64)>(symbol: 'wg_get_updates')
 external void wgGetUpdates(int handle, int replyPort);
 
 // ---------------------------------------------------------------------------

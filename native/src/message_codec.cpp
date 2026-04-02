@@ -1,9 +1,11 @@
 // native/src/message_codec.cpp
 // SPDX-License-Identifier: Apache-2.0
 #include "message_codec.h"
-#include <sstream>
-#include <iomanip>
+
 #include <windows.h>
+
+#include <iomanip>
+#include <sstream>
 
 namespace winget_nc {
 
@@ -12,12 +14,11 @@ namespace winget_nc {
 // ---------------------------------------------------------------------------
 std::string ToUtf8(const winrt::hstring& hs) {
   if (hs.empty()) return {};
-  const int sz = ::WideCharToMultiByte(CP_UTF8, 0,
-                                        hs.c_str(), static_cast<int>(hs.size()),
-                                        nullptr, 0, nullptr, nullptr);
+  const int sz = ::WideCharToMultiByte(CP_UTF8, 0, hs.c_str(), static_cast<int>(hs.size()), nullptr,
+                                       0, nullptr, nullptr);
   std::string out(sz, '\0');
-  ::WideCharToMultiByte(CP_UTF8, 0, hs.c_str(), static_cast<int>(hs.size()),
-                        out.data(), sz, nullptr, nullptr);
+  ::WideCharToMultiByte(CP_UTF8, 0, hs.c_str(), static_cast<int>(hs.size()), out.data(), sz,
+                        nullptr, nullptr);
   return out;
 }
 
@@ -29,11 +30,21 @@ std::string JsonEscape(const std::string& s) {
   out.reserve(s.size() + 4);
   for (unsigned char c : s) {
     switch (c) {
-      case '"':  out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n";  break;
-      case '\r': out += "\\r";  break;
-      case '\t': out += "\\t";  break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
       default:
         if (c < 0x20) {
           char buf[8];
@@ -53,7 +64,6 @@ std::string JsonEscape(const std::string& s) {
 bool PostToDart(Dart_Port port, const std::string& json) {
   Dart_CObject obj{};
   obj.type = Dart_CObject_kString;
-  // Dart_PostCObject_DL copies the string before returning.
   obj.value.as_string = const_cast<char*>(json.c_str());
   return Dart_PostCObject_DL(port, &obj) == true;
 }
@@ -61,11 +71,10 @@ bool PostToDart(Dart_Port port, const std::string& json) {
 // ---------------------------------------------------------------------------
 // Package encoder
 // ---------------------------------------------------------------------------
-std::string EncodePackage(const CatalogPackage& pkg,
-                          const std::string& catalog_id,
+std::string EncodePackage(const CatalogPackage& pkg, const std::string& catalog_id,
                           bool include_available_version) {
-  auto id      = JsonEscape(ToUtf8(pkg.Id()));
-  auto name    = JsonEscape(ToUtf8(pkg.Name()));
+  auto id = JsonEscape(ToUtf8(pkg.Id()));
+  auto name = JsonEscape(ToUtf8(pkg.Name()));
 
   // Installed version (may be null for search-only results)
   std::string version;
@@ -89,14 +98,12 @@ std::string EncodePackage(const CatalogPackage& pkg,
   }
 
   std::ostringstream o;
-  o << R"({"pkg":{"id":")" << id
-    << R"(","name":")" << name
-    << R"(","version":")" << (version.empty() ? avail : version) << '"';
+  o << R"({"pkg":{"id":")" << id << R"(","name":")" << name << R"(","version":")"
+    << (version.empty() ? avail : version) << '"';
   if (include_available_version && !avail.empty()) {
     o << R"(,"available_version":")" << avail << '"';
   }
-  o << R"(,"source":")" << src << '"'
-    << R"(,"catalog":")" << JsonEscape(catalog_id) << R"("}})";
+  o << R"(,"source":")" << src << '"' << R"(,"catalog":")" << JsonEscape(catalog_id) << R"("}})";
   return o.str();
 }
 
@@ -105,8 +112,8 @@ std::string EncodePackage(const CatalogPackage& pkg,
 // ---------------------------------------------------------------------------
 std::string EncodeCatalog(const PackageCatalogInfo& info) {
   std::ostringstream o;
-  o << R"({"catalog":{"id":")" << JsonEscape(ToUtf8(info.Id()))
-    << R"(","name":")" << JsonEscape(ToUtf8(info.Name())) << R"("}})";
+  o << R"({"catalog":{"id":")" << JsonEscape(ToUtf8(info.Id())) << R"(","name":")"
+    << JsonEscape(ToUtf8(info.Name())) << R"("}})";
   return o.str();
 }
 
@@ -115,12 +122,18 @@ std::string EncodeCatalog(const PackageCatalogInfo& info) {
 // ---------------------------------------------------------------------------
 std::string InstallStateToString(PackageInstallProgressState state) {
   switch (state) {
-    case PackageInstallProgressState::Queued:       return "queued";
-    case PackageInstallProgressState::Downloading:  return "downloading";
-    case PackageInstallProgressState::Installing:   return "installing";
-    case PackageInstallProgressState::PostInstall:  return "postInstall";
-    case PackageInstallProgressState::Finished:     return "finished";
-    default:                                         return "unknown";
+    case PackageInstallProgressState::Queued:
+      return "queued";
+    case PackageInstallProgressState::Downloading:
+      return "downloading";
+    case PackageInstallProgressState::Installing:
+      return "installing";
+    case PackageInstallProgressState::PostInstall:
+      return "postInstall";
+    case PackageInstallProgressState::Finished:
+      return "finished";
+    default:
+      return "unknown";
   }
 }
 
@@ -162,17 +175,16 @@ std::string EncodeInstallProgress(const InstallProgress& p) {
       label = "Pending...";
   }
   std::ostringstream o;
-  o << R"({"progress":{"percent":)" << pct
-    << R"(,"state":")" << state
-    << R"(","label":")" << JsonEscape(label) << R"("}})";
+  o << R"({"progress":{"percent":)" << pct << R"(,"state":")" << state << R"(","label":")"
+    << JsonEscape(label) << R"("}})";
   return o.str();
 }
 
 std::string EncodeUninstallProgress(const UninstallProgress& p) {
   int pct = static_cast<int>(p.UninstallationProgress * 100.0);
   std::ostringstream o;
-  o << R"({"progress":{"percent":)" << pct
-    << R"(,"state":"uninstalling","label":"Uninstalling )" << pct << R"(%"}})";
+  o << R"({"progress":{"percent":)" << pct << R"(,"state":"uninstalling","label":"Uninstalling )"
+    << pct << R"(%"}})";
   return o.str();
 }
 
@@ -185,9 +197,13 @@ static std::string PackageArrayJson(const std::vector<CatalogPackage>& pkgs,
   for (size_t i = 0; i < pkgs.size(); ++i) {
     // Strip outer {"pkg":{...}} wrapper — embed inner object directly in array.
     auto full = EncodePackage(pkgs[i], catalog_id);
-    // full = {"pkg":{...}} -> extract inner object
+    // full = {"pkg":{...}} -> extract inner object, skipping outer { and }
     auto inner_start = full.find('{', 1);
-    auto inner_end   = full.rfind('}');
+    auto outer_end = full.rfind('}');
+    if (inner_start == std::string::npos || outer_end == std::string::npos || outer_end < 2) {
+      continue;  // malformed — skip this entry
+    }
+    auto inner_end = outer_end - 1;  // skip outer closing brace
     out += full.substr(inner_start, inner_end - inner_start + 1);
     if (i + 1 < pkgs.size()) out += ',';
   }
@@ -197,19 +213,18 @@ static std::string PackageArrayJson(const std::vector<CatalogPackage>& pkgs,
 
 std::string EncodePlan(const InstallPlan& plan, const std::string& catalog_id) {
   std::ostringstream o;
-  o << R"({"plan":{"installing":)"  << PackageArrayJson(plan.installing, catalog_id)
-    << R"(,"upgrading":)"           << PackageArrayJson(plan.upgrading,  catalog_id)
-    << R"(,"removing":)"            << PackageArrayJson(plan.removing,   catalog_id)
-    << "}}";
+  o << R"({"plan":{"installing":)" << PackageArrayJson(plan.installing, catalog_id)
+    << R"(,"upgrading":)" << PackageArrayJson(plan.upgrading, catalog_id) << R"(,"removing":)"
+    << PackageArrayJson(plan.removing, catalog_id) << "}}";
   return o.str();
 }
 
 // ---------------------------------------------------------------------------
 // Terminal encoders
 // ---------------------------------------------------------------------------
-std::string EncodeDone()     { return R"({"done":true})"; }
-std::string EncodeSuccess()  { return R"({"result":{"success":true}})"; }
-std::string EncodeCancelled(){ return R"({"cancelled":true})"; }
+std::string EncodeDone() { return R"({"done":true})"; }
+std::string EncodeSuccess() { return R"({"result":{"success":true}})"; }
+std::string EncodeCancelled() { return R"({"cancelled":true})"; }
 
 std::string EncodeError(const std::string& message, int32_t hresult) {
   std::ostringstream o;

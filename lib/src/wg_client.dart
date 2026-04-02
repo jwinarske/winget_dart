@@ -49,6 +49,10 @@ class WgClient {
     int maxRetries = 0,
     Duration retryDelay = Duration.zero,
   }) async {
+    // Initialize the Dart API bridge first so that Dart_PostCObject_DL
+    // is available before any WinGet DLLs are loaded.
+    bridge.init();
+
     // Retry loop for the fresh-login race condition (App Installer not
     // yet registered after first login on a fresh Windows installation).
     for (var attempt = 0; attempt <= maxRetries; attempt++) {
@@ -63,31 +67,30 @@ class WgClient {
       }
       // Exponential backoff capped at 30 seconds.
       final wait = retryDelay * (attempt + 1);
-      await Future<void>.delayed(
-          wait > const Duration(seconds: 30)
-              ? const Duration(seconds: 30)
-              : wait);
+      await Future<void>.delayed(wait > const Duration(seconds: 30)
+          ? const Duration(seconds: 30)
+          : wait);
     }
-
-    bridge.init();
 
     final port = ReceivePort();
-    final handle = bridge.connect(port.sendPort);
-    if (handle < 0) {
+    try {
+      final handle = bridge.connect(port.sendPort);
+      if (handle < 0) {
+        throw WgException(
+            'wg_connect returned HRESULT 0x${handle.toRadixString(16)}');
+      }
+
+      final msg = await port.first;
+      final decoded = MessageDecoder.decode(msg);
+      if (decoded['error'] != null) {
+        throw WgException(decoded['error'] as String,
+            hresult: decoded['hresult'] as int?);
+      }
+
+      return WgClient._(handle, bridge);
+    } finally {
       port.close();
-      throw WgException(
-          'wg_connect returned HRESULT 0x${handle.toRadixString(16)}');
     }
-
-    final msg = await port.first as String;
-    port.close();
-    final decoded = MessageDecoder.decode(msg);
-    if (decoded['error'] != null) {
-      throw WgException(decoded['error'] as String,
-          hresult: decoded['hresult'] as int?);
-    }
-
-    return WgClient._(handle, bridge);
   }
 
   /// Disconnect and release COM references.
@@ -103,18 +106,22 @@ class WgClient {
 
   Future<List<WgCatalog>> listCatalogs() async {
     final port = ReceivePort();
-    _bridge.listCatalogs(_handle, port.sendPort);
-    final catalogs = <WgCatalog>[];
-    await for (final msg in port) {
-      final decoded = MessageDecoder.decode(msg as String);
-      if (decoded.containsKey('done')) break;
-      if (decoded['error'] != null) {
-        throw WgException(decoded['error'] as String);
+    try {
+      _bridge.listCatalogs(_handle, port.sendPort);
+      final catalogs = <WgCatalog>[];
+      await for (final msg in port) {
+        final decoded = MessageDecoder.decode(msg);
+        if (decoded.containsKey('done')) break;
+        if (decoded['error'] != null) {
+          throw WgException(decoded['error'] as String);
+        }
+        catalogs.add(
+            WgCatalog.fromJson(decoded['catalog'] as Map<String, dynamic>));
       }
-      catalogs.add(
-          WgCatalog.fromJson(decoded['catalog'] as Map<String, dynamic>));
+      return catalogs;
+    } finally {
+      port.close();
     }
-    return catalogs;
   }
 
   // ---------------------------------------------------------------------------
@@ -131,17 +138,20 @@ class WgClient {
   /// Find a specific package by ID.
   Future<WgPackage?> findById(String packageId, {String? catalogId}) async {
     final port = ReceivePort();
-    _bridge.findById(_handle, packageId, catalogId, port.sendPort);
-    final msg = await port.first as String;
-    port.close();
-    final decoded = MessageDecoder.decode(msg);
-    if (decoded['error'] != null) {
-      throw WgException(decoded['error'] as String);
+    try {
+      _bridge.findById(_handle, packageId, catalogId, port.sendPort);
+      final msg = await port.first;
+      final decoded = MessageDecoder.decode(msg);
+      if (decoded['error'] != null) {
+        throw WgException(decoded['error'] as String);
+      }
+      final pkg = decoded['pkg'];
+      return pkg == null
+          ? null
+          : WgPackage.fromJson(pkg as Map<String, dynamic>);
+    } finally {
+      port.close();
     }
-    final pkg = decoded['pkg'];
-    return pkg == null
-        ? null
-        : WgPackage.fromJson(pkg as Map<String, dynamic>);
   }
 
   // ---------------------------------------------------------------------------
@@ -161,15 +171,18 @@ class WgClient {
   Future<WgInstallPlan> simulateInstall(String packageId,
       {String? catalogId, String? version}) async {
     final port = ReceivePort();
-    _bridge.simulateInstall(
-        _handle, packageId, catalogId, version, port.sendPort);
-    final msg = await port.first as String;
-    port.close();
-    final decoded = MessageDecoder.decode(msg);
-    if (decoded['error'] != null) {
-      throw WgException(decoded['error'] as String);
+    try {
+      _bridge.simulateInstall(
+          _handle, packageId, catalogId, version, port.sendPort);
+      final msg = await port.first;
+      final decoded = MessageDecoder.decode(msg);
+      if (decoded['error'] != null) {
+        throw WgException(decoded['error'] as String);
+      }
+      return WgInstallPlan.fromJson(decoded['plan'] as Map<String, dynamic>);
+    } finally {
+      port.close();
     }
-    return WgInstallPlan.fromJson(decoded['plan'] as Map<String, dynamic>);
   }
 
   // ---------------------------------------------------------------------------
@@ -191,8 +204,7 @@ class WgClient {
     );
   }
 
-  WgTransaction<void> uninstallPackage(String packageId,
-      {bool silent = true}) {
+  WgTransaction<void> uninstallPackage(String packageId, {bool silent = true}) {
     return _progressTransaction(
       (port) => _bridge.uninstall(_handle, packageId, silent, port),
     );
@@ -225,34 +237,43 @@ class WgClient {
     final controller = StreamController<WgPackage>();
     final completer = Completer<List<WgPackage>>();
 
+    void cleanup(Object error, [StackTrace? stackTrace]) {
+      if (!completer.isCompleted) {
+        controller.addError(error, stackTrace);
+        controller.close();
+        completer.completeError(error, stackTrace);
+      }
+      port.close();
+    }
+
     startFn(port.sendPort);
 
-    port.listen((msg) {
-      final decoded = MessageDecoder.decode(msg as String);
-      if (decoded.containsKey('done')) {
-        controller.close();
-        completer.complete(packages);
-        port.close();
-      } else if (decoded.containsKey('cancelled')) {
-        final ex = const WgCancelledException();
-        controller.addError(ex);
-        controller.close();
-        completer.completeError(ex);
-        port.close();
-      } else if (decoded['error'] != null) {
-        final ex = WgException(decoded['error'] as String,
-            hresult: decoded['hresult'] as int?);
-        controller.addError(ex);
-        controller.close();
-        completer.completeError(ex);
-        port.close();
-      } else if (decoded['pkg'] != null) {
-        final pkg =
-            WgPackage.fromJson(decoded['pkg'] as Map<String, dynamic>);
-        packages.add(pkg);
-        controller.add(pkg);
-      }
-    });
+    port.listen(
+      (msg) {
+        try {
+          final decoded = MessageDecoder.decode(msg);
+          if (decoded.containsKey('done')) {
+            controller.close();
+            completer.complete(packages);
+            port.close();
+          } else if (decoded.containsKey('cancelled')) {
+            cleanup(const WgCancelledException());
+          } else if (decoded['error'] != null) {
+            cleanup(WgException(decoded['error'] as String,
+                hresult: decoded['hresult'] as int?));
+          } else if (decoded['pkg'] != null) {
+            final pkg =
+                WgPackage.fromJson(decoded['pkg'] as Map<String, dynamic>);
+            packages.add(pkg);
+            controller.add(pkg);
+          }
+        } catch (e, st) {
+          cleanup(e, st);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) =>
+          cleanup(error, stackTrace),
+    );
 
     return WgTransaction<List<WgPackage>>(
       packages: controller.stream,
@@ -267,29 +288,41 @@ class WgClient {
     final progressController = StreamController<WgProgress>();
     final completer = Completer<void>();
 
+    void cleanup(Object error, [StackTrace? stackTrace]) {
+      if (!completer.isCompleted) {
+        progressController.addError(error, stackTrace);
+        progressController.close();
+        completer.completeError(error, stackTrace);
+      }
+      port.close();
+    }
+
     startFn(port.sendPort);
 
-    port.listen((msg) {
-      final decoded = MessageDecoder.decode(msg as String);
-      if (decoded.containsKey('result')) {
-        progressController.close();
-        completer.complete();
-        port.close();
-      } else if (decoded.containsKey('cancelled')) {
-        progressController.close();
-        completer.completeError(const WgCancelledException());
-        port.close();
-      } else if (decoded['error'] != null) {
-        final ex = WgException(decoded['error'] as String,
-            hresult: decoded['hresult'] as int?);
-        progressController.addError(ex);
-        completer.completeError(ex);
-        port.close();
-      } else if (decoded['progress'] != null) {
-        progressController.add(WgProgress.fromJson(
-            decoded['progress'] as Map<String, dynamic>));
-      }
-    });
+    port.listen(
+      (msg) {
+        try {
+          final decoded = MessageDecoder.decode(msg);
+          if (decoded.containsKey('result')) {
+            progressController.close();
+            completer.complete();
+            port.close();
+          } else if (decoded.containsKey('cancelled')) {
+            cleanup(const WgCancelledException());
+          } else if (decoded['error'] != null) {
+            cleanup(WgException(decoded['error'] as String,
+                hresult: decoded['hresult'] as int?));
+          } else if (decoded['progress'] != null) {
+            progressController.add(WgProgress.fromJson(
+                decoded['progress'] as Map<String, dynamic>));
+          }
+        } catch (e, st) {
+          cleanup(e, st);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) =>
+          cleanup(error, stackTrace),
+    );
 
     return WgTransaction<void>(
       packages: const Stream.empty(),

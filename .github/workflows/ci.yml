@@ -105,6 +105,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.10.1
       - run: dart pub get
       - run: dart test --exclude-tags=integration
 
@@ -117,6 +119,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.10.1
       - run: dart pub get
       - run: dart test --tags=integration
         continue-on-error: true
@@ -127,6 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.10.1
       - run: dart pub get
       - run: dart pub publish --dry-run
       - run: dart analyze
@@ -137,6 +143,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.10.1
       - run: dart pub get
       - run: dart pub global activate coverage
       - run: dart test --coverage=coverage --exclude-tags=integration
@@ -144,9 +152,36 @@ jobs:
         run: >
           dart pub global run coverage:format_coverage
           --lcov --in=coverage --out=coverage/lcov.info
-        if: always()
-      - uses: codecov/codecov-action@v4
+          --report-on=lib
+      - name: Filter generated files from coverage
+        shell: python
+        run: |
+          import re
+          with open('coverage/lcov.info', 'r') as f:
+              content = f.read()
+          # Remove blocks for generated files (*.g.dart, *.freezed.dart)
+          filtered = re.sub(
+              r'SF:.*?\.(g|freezed)\.dart\n.*?end_of_record\n',
+              '',
+              content,
+              flags=re.DOTALL,
+          )
+          with open('coverage/lcov.info', 'w') as f:
+              f.write(filtered)
+      - name: Enforce 60% coverage threshold
+        shell: bash
+        run: |
+          awk -F: '
+            /^LH:/ { hit += $2 }
+            /^LF:/ { found += $2 }
+            END {
+              pct = (found > 0) ? (hit / found) * 100 : 0;
+              printf "Coverage: %.1f%% (%d/%d lines)\n", pct, hit, found;
+              if (pct < 60) { print "FAIL: below 60% threshold"; exit 1 }
+            }
+          ' coverage/lcov.info
+      - uses: codecov/codecov-action@v5
         with:
           files: coverage/lcov.info
-        if: always()
-        continue-on-error: true
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

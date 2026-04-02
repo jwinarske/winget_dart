@@ -33,8 +33,15 @@ void main() {
 
   group('MessageDecoder.discriminator', () {
     const knownKeys = [
-      'pkg', 'catalog', 'progress', 'plan',
-      'done', 'result', 'error', 'cancelled', 'ok',
+      'pkg',
+      'catalog',
+      'progress',
+      'plan',
+      'done',
+      'result',
+      'error',
+      'cancelled',
+      'ok',
     ];
 
     for (final key in knownKeys) {
