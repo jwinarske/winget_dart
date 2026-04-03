@@ -104,6 +104,7 @@ class WgClient {
   // Catalogs
   // ---------------------------------------------------------------------------
 
+  /// Returns all configured package catalogs.
   Future<List<WgCatalog>> listCatalogs() async {
     final port = ReceivePort();
     try {
@@ -158,6 +159,7 @@ class WgClient {
   // Installed packages
   // ---------------------------------------------------------------------------
 
+  /// Returns all locally installed packages.
   WgTransaction<List<WgPackage>> listInstalled() {
     return _streamingTransaction(
       (port) => _bridge.listInstalled(_handle, port),
@@ -168,6 +170,7 @@ class WgClient {
   // Simulate (dry-run)
   // ---------------------------------------------------------------------------
 
+  /// Dry-runs an install to preview what packages would be added or changed.
   Future<WgInstallPlan> simulateInstall(String packageId,
       {String? catalogId, String? version}) async {
     final port = ReceivePort();
@@ -189,6 +192,7 @@ class WgClient {
   // Install / Upgrade / Uninstall
   // ---------------------------------------------------------------------------
 
+  /// Installs a package, emitting progress events.
   WgTransaction<void> installPackage(String packageId,
       {String? catalogId, String? version, bool silent = true}) {
     return _progressTransaction(
@@ -197,6 +201,7 @@ class WgClient {
     );
   }
 
+  /// Upgrades a package to the latest (or specified) version.
   WgTransaction<void> upgradePackage(String packageId,
       {String? version, bool silent = true}) {
     return _progressTransaction(
@@ -204,6 +209,7 @@ class WgClient {
     );
   }
 
+  /// Uninstalls a package.
   WgTransaction<void> uninstallPackage(String packageId, {bool silent = true}) {
     return _progressTransaction(
       (port) => _bridge.uninstall(_handle, packageId, silent, port),
@@ -214,6 +220,7 @@ class WgClient {
   // Updates
   // ---------------------------------------------------------------------------
 
+  /// Returns packages that have available upgrades.
   WgTransaction<List<WgPackage>> getUpdates() {
     return _streamingTransaction(
       (port) => _bridge.getUpdates(_handle, port),
@@ -224,6 +231,7 @@ class WgClient {
   // Cancellation
   // ---------------------------------------------------------------------------
 
+  /// Cancels any in-flight operation.
   void cancel() => _bridge.cancel(_handle);
 
   // ---------------------------------------------------------------------------

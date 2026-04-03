@@ -1,3 +1,13 @@
+## 0.3.0
+
+### Improvements
+
+- Add dartdoc comments to all public API elements (models, exceptions,
+  `WingetBridge` interface, and `WgClient` methods)
+- Add `example/example.dart` for pub.dev example tab
+- Shorten package description to meet pub.dev 60–180 character guideline
+- Bump minimum SDK constraint to `>=3.6.0` for build hook support
+
 ## 0.2.0
 
 ### Features
