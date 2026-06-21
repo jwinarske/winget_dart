@@ -28,39 +28,67 @@ void setWingetLibraryPath(String path) => _overridePath = path;
 DynamicLibrary? _cached;
 
 /// Load the winget_nc native library, searching several well-known locations.
-DynamicLibrary loadWingetNc() => _cached ??= _resolve();
+DynamicLibrary loadWingetNc() => _cached ??= _open();
 
-DynamicLibrary _resolve() {
+DynamicLibrary _open() {
+  final path = resolveWingetNcPath(
+    overridePath: _overridePath,
+    environment: Platform.environment,
+    packageConfig: Platform.packageConfig,
+    currentDir: Directory.current.path,
+    resolvedExecutable: Platform.resolvedExecutable,
+    hostArch: _hostArch(),
+  );
+  return DynamicLibrary.open(path ?? 'winget_nc.dll');
+}
+
+/// Resolve the path to winget_nc.dll by searching well-known locations.
+///
+/// Returns the absolute path to the DLL, or `null` if no candidate is found
+/// (the caller should fall back to the bare filename and let the OS search).
+///
+/// All I/O dependencies are injected as parameters so this function is
+/// testable without mocking globals.
+String? resolveWingetNcPath({
+  String? overridePath,
+  Map<String, String> environment = const {},
+  String? packageConfig,
+  String? currentDir,
+  String? resolvedExecutable,
+  String hostArch = 'x64',
+}) {
   // 0. Explicit programmatic override.
-  if (_overridePath != null && _overridePath!.isNotEmpty) {
-    return DynamicLibrary.open(_overridePath!);
+  if (overridePath != null && overridePath.isNotEmpty) {
+    return overridePath;
   }
 
   // 1. Environment variable override.
-  final envPath = Platform.environment['WINGET_NC_LIB'];
+  final envPath = environment['WINGET_NC_LIB'];
   if (envPath != null && envPath.isNotEmpty) {
-    return DynamicLibrary.open(envPath);
+    return envPath;
   }
 
   // 2. Code-assets location: .dart_tool/lib/ in the consuming project.
   //    This is where `dart run` / `dart test` place the DLL via the build hook.
-  final dartToolLib = _findDartToolLib();
+  final dartToolLib = findDartToolLib(
+    packageConfig: packageConfig,
+    currentDir: currentDir,
+  );
   if (dartToolLib != null) {
     final dll = File(p.join(dartToolLib, 'winget_nc.dll'));
-    if (dll.existsSync()) return DynamicLibrary.open(dll.path);
+    if (dll.existsSync()) return dll.path;
   }
 
   // 3. Build-hook temp output: %TEMP%\wg_nc_<hash>_<arch>\install\bin\.
   //    The build hook uses a short temp path to avoid MAX_PATH issues.
   //    Search for the most recent build.
-  final tempDir = Platform.environment['TEMP'] ?? r'C:\Temp';
-  final arch = _hostArch();
+  final tempDir = environment['TEMP'] ?? r'C:\Temp';
   final tempBuilds = <File>[];
   try {
     for (final entry in Directory(tempDir).listSync()) {
       if (entry is Directory &&
           entry.path.contains('wg_nc_') &&
-          entry.path.endsWith('_$arch')) {
+          entry.path.endsWith('_$hostArch')) {
         final dll = File(p.join(entry.path, 'install', 'bin', 'winget_nc.dll'));
         if (dll.existsSync()) tempBuilds.add(dll);
       }
@@ -72,30 +100,35 @@ DynamicLibrary _resolve() {
     // Pick the most recently modified build.
     tempBuilds
         .sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
-    return DynamicLibrary.open(tempBuilds.first.path);
+    return tempBuilds.first.path;
   }
 
   // 4. Next to the running executable (AOT-compiled / bundled deployment).
-  final exeDir = p.dirname(Platform.resolvedExecutable);
-  for (final candidate in [
-    p.join(exeDir, 'winget_nc.dll'),
-    p.join(exeDir, 'lib', 'winget_nc.dll'),
-  ]) {
-    if (File(candidate).existsSync()) {
-      return DynamicLibrary.open(candidate);
+  if (resolvedExecutable != null) {
+    final exeDir = p.dirname(resolvedExecutable);
+    for (final candidate in [
+      p.join(exeDir, 'winget_nc.dll'),
+      p.join(exeDir, 'lib', 'winget_nc.dll'),
+    ]) {
+      if (File(candidate).existsSync()) {
+        return candidate;
+      }
     }
   }
 
-  // 5. Last resort: let the OS search PATH / system dirs.
-  return DynamicLibrary.open('winget_nc.dll');
+  // 5. No candidate found — caller falls back to bare filename.
+  return null;
 }
 
 /// Best-effort discovery of .dart_tool/lib/ in the consuming project.
-String? _findDartToolLib() {
+///
+/// Exported for testing. Not part of the public API.
+String? findDartToolLib({String? packageConfig, String? currentDir}) {
   // The package config points into .dart_tool/.
-  final pc = Platform.packageConfig;
-  if (pc != null && pc.isNotEmpty) {
-    final path = pc.startsWith('file:') ? Uri.parse(pc).toFilePath() : pc;
+  if (packageConfig != null && packageConfig.isNotEmpty) {
+    final path = packageConfig.startsWith('file:')
+        ? Uri.parse(packageConfig).toFilePath()
+        : packageConfig;
     // .../.dart_tool/package_config.json → .../.dart_tool
     final dir = p.dirname(path);
     if (p.basename(dir) == '.dart_tool') {
@@ -103,14 +136,16 @@ String? _findDartToolLib() {
       if (Directory(lib).existsSync()) return lib;
     }
   }
-  // Walk up from cwd.
-  var dir = Directory.current;
-  for (var i = 0; i < 8; i++) {
-    final lib = p.join(dir.path, '.dart_tool', 'lib');
-    if (Directory(lib).existsSync()) return lib;
-    final parent = dir.parent;
-    if (parent.path == dir.path) break;
-    dir = parent;
+  // Walk up from currentDir.
+  if (currentDir != null) {
+    var dir = Directory(currentDir);
+    for (var i = 0; i < 8; i++) {
+      final lib = p.join(dir.path, '.dart_tool', 'lib');
+      if (Directory(lib).existsSync()) return lib;
+      final parent = dir.parent;
+      if (parent.path == dir.path) break;
+      dir = parent;
+    }
   }
   return null;
 }
