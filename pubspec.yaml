@@ -2,7 +2,7 @@ name: winget_dart
 description: >-
   Dart FFI bindings for WinGet (Windows Package Manager). Search, install,
   upgrade, and uninstall packages with async progress on x64 and ARM64.
-version: 0.3.0
+version: 0.3.1
 repository: https://github.com/jwinarske/winget_dart
 issue_tracker: https://github.com/jwinarske/winget_dart/issues
 

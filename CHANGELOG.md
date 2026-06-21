@@ -1,3 +1,23 @@
+## 0.3.1
+
+### Fixes
+
+- Fix native DLL not found when run via `dart pub global activate` /
+  `dart pub global run`. The `@Native` / `@DefaultAsset` code-assets
+  approach only resolves when the hooks runner is active; globally
+  activated packages skip it. Replaced with explicit
+  `DynamicLibrary.open()` and a multi-strategy search path matching the
+  pattern used by `packagekit_dart`.
+- Add `resolveWingetNcPath()` with fallback chain: programmatic override →
+  `WINGET_NC_LIB` env var → `.dart_tool/lib/` → `%TEMP%\wg_nc_*` build-hook
+  output → next to executable → OS search path.
+- Export `setWingetLibraryPath()` for consumers that vendor the DLL.
+
+### Testing
+
+- Add 18 unit tests for `library_loader.dart` covering all resolution
+  strategies, precedence ordering, arch filtering, and edge cases.
+
 ## 0.3.0
 
 ### Improvements
