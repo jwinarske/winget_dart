@@ -30,13 +30,13 @@ class WgPackage {
 
   /// Deserializes a [WgPackage] from a JSON map.
   factory WgPackage.fromJson(Map<String, dynamic> j) => WgPackage(
-        id: j['id'] as String,
-        name: j['name'] as String,
-        version: j['version'] as String,
-        availableVersion: j['available_version'] as String?,
-        source: j['source'] as String? ?? '',
-        catalogId: j['catalog'] as String? ?? '',
-      );
+    id: j['id'] as String,
+    name: j['name'] as String,
+    version: j['version'] as String,
+    availableVersion: j['available_version'] as String?,
+    source: j['source'] as String? ?? '',
+    catalogId: j['catalog'] as String? ?? '',
+  );
 
   @override
   String toString() => 'WgPackage($id $version)';

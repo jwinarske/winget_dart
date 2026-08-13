@@ -10,10 +10,8 @@ class WgCatalog {
   const WgCatalog({required this.id, required this.name});
 
   /// Deserializes a [WgCatalog] from a JSON map.
-  factory WgCatalog.fromJson(Map<String, dynamic> j) => WgCatalog(
-        id: j['id'] as String,
-        name: j['name'] as String,
-      );
+  factory WgCatalog.fromJson(Map<String, dynamic> j) =>
+      WgCatalog(id: j['id'] as String, name: j['name'] as String);
 
   @override
   String toString() => 'WgCatalog($id)';

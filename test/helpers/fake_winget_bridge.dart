@@ -31,8 +31,11 @@ abstract final class Msg {
   static String catalog(String id, {String? name}) =>
       '{"catalog":{"id":"$id","name":"${name ?? id}"}}';
 
-  static String progress(int percent,
-          {String state = 'downloading', String? label}) =>
+  static String progress(
+    int percent, {
+    String state = 'downloading',
+    String? label,
+  }) =>
       '{"progress":{"percent":$percent,"state":"$state",'
       '"label":"${label ?? '$state ($percent%)'}"}}';
 
@@ -149,10 +152,9 @@ final class FakeWingetBridge implements WingetBridge {
   @override
   int connect(SendPort reply) {
     _post(
-        reply,
-        _connectOk
-            ? Msg.ok
-            : Msg.error(_connectError, hresult: _connectHresult));
+      reply,
+      _connectOk ? Msg.ok : Msg.error(_connectError, hresult: _connectHresult),
+    );
     return _connectHandle;
   }
 
@@ -172,9 +174,14 @@ final class FakeWingetBridge implements WingetBridge {
 
   @override
   void findById(
-          int handle, String packageId, String? catalogId, SendPort reply) =>
-      _postAll(
-          reply, _responses['findById:$packageId'] ?? [Msg.error('Not found')]);
+    int handle,
+    String packageId,
+    String? catalogId,
+    SendPort reply,
+  ) => _postAll(
+    reply,
+    _responses['findById:$packageId'] ?? [Msg.error('Not found')],
+  );
 
   @override
   void listInstalled(int handle, SendPort reply) =>
@@ -185,24 +192,40 @@ final class FakeWingetBridge implements WingetBridge {
       _postAll(reply, _responses['getUpdates'] ?? [Msg.done]);
 
   @override
-  void simulateInstall(int handle, String packageId, String? catalogId,
-          String? version, SendPort reply) =>
+  void simulateInstall(
+    int handle,
+    String packageId,
+    String? catalogId,
+    String? version,
+    SendPort reply,
+  ) =>
       _postAll(reply, _responses['simulateInstall:$packageId'] ?? [Msg.plan()]);
 
   @override
   void simulateUpgrade(int handle, String? packageId, SendPort reply) =>
-      _postAll(reply,
-          _responses['simulateUpgrade:${packageId ?? '*'}'] ?? [Msg.plan()]);
+      _postAll(
+        reply,
+        _responses['simulateUpgrade:${packageId ?? '*'}'] ?? [Msg.plan()],
+      );
 
   @override
-  void install(int handle, String packageId, String? catalogId, String? version,
-          bool silent, SendPort reply) =>
-      _postAll(reply, _responses['install:$packageId'] ?? [Msg.success]);
+  void install(
+    int handle,
+    String packageId,
+    String? catalogId,
+    String? version,
+    bool silent,
+    SendPort reply,
+  ) => _postAll(reply, _responses['install:$packageId'] ?? [Msg.success]);
 
   @override
-  void upgrade(int handle, String packageId, String? version, bool silent,
-          SendPort reply) =>
-      _postAll(reply, _responses['upgrade:$packageId'] ?? [Msg.success]);
+  void upgrade(
+    int handle,
+    String packageId,
+    String? version,
+    bool silent,
+    SendPort reply,
+  ) => _postAll(reply, _responses['upgrade:$packageId'] ?? [Msg.success]);
 
   @override
   void uninstall(int handle, String packageId, bool silent, SendPort reply) =>
@@ -218,8 +241,9 @@ final class FakeWingetBridge implements WingetBridge {
     var i = 0;
     for (final msg in messages) {
       final index = i++;
-      Future<void>.delayed(Duration(microseconds: index * 100))
-          .then((_) => port.send(msg));
+      Future<void>.delayed(
+        Duration(microseconds: index * 100),
+      ).then((_) => port.send(msg));
     }
   }
 }

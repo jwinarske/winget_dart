@@ -24,14 +24,14 @@ class WgInstallPlan {
 
   /// Deserializes a [WgInstallPlan] from a JSON map.
   factory WgInstallPlan.fromJson(Map<String, dynamic> j) => WgInstallPlan(
-        installing: (j['installing'] as List? ?? [])
-            .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        upgrading: (j['upgrading'] as List? ?? [])
-            .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        removing: (j['removing'] as List? ?? [])
-            .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    installing: (j['installing'] as List? ?? [])
+        .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    upgrading: (j['upgrading'] as List? ?? [])
+        .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    removing: (j['removing'] as List? ?? [])
+        .map((e) => WgPackage.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }

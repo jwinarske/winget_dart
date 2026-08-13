@@ -10,7 +10,8 @@ void main() {
 
     test('decodes nested objects', () {
       final result = MessageDecoder.decode(
-          '{"pkg":{"id":"X","name":"Y","version":"1.0"}}');
+        '{"pkg":{"id":"X","name":"Y","version":"1.0"}}',
+      );
       expect(result['pkg'], isA<Map<String, dynamic>>());
     });
 
@@ -64,10 +65,7 @@ void main() {
     });
 
     test('throws FormatException for an empty map', () {
-      expect(
-        () => MessageDecoder.discriminator({}),
-        throwsFormatException,
-      );
+      expect(() => MessageDecoder.discriminator({}), throwsFormatException);
     });
 
     test('returns a known key when multiple are present', () {

@@ -21,14 +21,19 @@ void main() {
       expect(WgInstallState.from(''), equals(WgInstallState.unknown));
       expect(WgInstallState.from('garbage'), equals(WgInstallState.unknown));
       expect(
-          WgInstallState.from('DOWNLOADING'), equals(WgInstallState.unknown));
+        WgInstallState.from('DOWNLOADING'),
+        equals(WgInstallState.unknown),
+      );
     });
   });
 
   group('WgProgress.fromJson', () {
     test('parses all fields', () {
-      final p = WgProgress.fromJson(
-          {'percent': 42, 'state': 'installing', 'label': 'Installing...'});
+      final p = WgProgress.fromJson({
+        'percent': 42,
+        'state': 'installing',
+        'label': 'Installing...',
+      });
       expect(p.percent, equals(42));
       expect(p.state, equals(WgInstallState.installing));
       expect(p.label, equals('Installing...'));
@@ -48,9 +53,14 @@ void main() {
 
     test('toString includes percent and state', () {
       final p = WgProgress(
-          percent: 50, state: WgInstallState.downloading, label: 'dl');
+        percent: 50,
+        state: WgInstallState.downloading,
+        label: 'dl',
+      );
       expect(
-          p.toString(), equals('WgProgress(50% WgInstallState.downloading)'));
+        p.toString(),
+        equals('WgProgress(50% WgInstallState.downloading)'),
+      );
     });
   });
 }

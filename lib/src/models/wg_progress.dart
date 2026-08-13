@@ -20,9 +20,9 @@ enum WgInstallState {
 
   /// Parses a state name string, falling back to [unknown].
   static WgInstallState from(String s) => WgInstallState.values.firstWhere(
-        (e) => e.name == s,
-        orElse: () => WgInstallState.unknown,
-      );
+    (e) => e.name == s,
+    orElse: () => WgInstallState.unknown,
+  );
 }
 
 /// Progress event emitted during install, upgrade, or uninstall operations.
@@ -45,10 +45,10 @@ class WgProgress {
 
   /// Deserializes a [WgProgress] from a JSON map.
   factory WgProgress.fromJson(Map<String, dynamic> j) => WgProgress(
-        percent: j['percent'] as int? ?? 0,
-        state: WgInstallState.from(j['state'] as String? ?? 'unknown'),
-        label: j['label'] as String? ?? '',
-      );
+    percent: j['percent'] as int? ?? 0,
+    state: WgInstallState.from(j['state'] as String? ?? 'unknown'),
+    label: j['label'] as String? ?? '',
+  );
 
   @override
   String toString() => 'WgProgress($percent% $state)';

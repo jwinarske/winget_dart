@@ -60,16 +60,17 @@ class WgClient {
 
       if (attempt == maxRetries) {
         throw const WgNotAvailableException(
-            'Windows Package Manager (App Installer) is not installed or '
-            'not reachable. Windows 10 1809+ (x64) or Windows 11 (ARM64) '
-            'required. If this is a freshly provisioned machine, log out '
-            'and back in to complete App Installer registration.');
+          'Windows Package Manager (App Installer) is not installed or '
+          'not reachable. Windows 10 1809+ (x64) or Windows 11 (ARM64) '
+          'required. If this is a freshly provisioned machine, log out '
+          'and back in to complete App Installer registration.',
+        );
       }
       // Exponential backoff capped at 30 seconds.
       final wait = retryDelay * (attempt + 1);
-      await Future<void>.delayed(wait > const Duration(seconds: 30)
-          ? const Duration(seconds: 30)
-          : wait);
+      await Future<void>.delayed(
+        wait > const Duration(seconds: 30) ? const Duration(seconds: 30) : wait,
+      );
     }
 
     final port = ReceivePort();
@@ -77,14 +78,17 @@ class WgClient {
       final handle = bridge.connect(port.sendPort);
       if (handle < 0) {
         throw WgException(
-            'wg_connect returned HRESULT 0x${handle.toRadixString(16)}');
+          'wg_connect returned HRESULT 0x${handle.toRadixString(16)}',
+        );
       }
 
       final msg = await port.first;
       final decoded = MessageDecoder.decode(msg);
       if (decoded['error'] != null) {
-        throw WgException(decoded['error'] as String,
-            hresult: decoded['hresult'] as int?);
+        throw WgException(
+          decoded['error'] as String,
+          hresult: decoded['hresult'] as int?,
+        );
       }
 
       return WgClient._(handle, bridge);
@@ -117,7 +121,8 @@ class WgClient {
           throw WgException(decoded['error'] as String);
         }
         catalogs.add(
-            WgCatalog.fromJson(decoded['catalog'] as Map<String, dynamic>));
+          WgCatalog.fromJson(decoded['catalog'] as Map<String, dynamic>),
+        );
       }
       return catalogs;
     } finally {
@@ -171,12 +176,20 @@ class WgClient {
   // ---------------------------------------------------------------------------
 
   /// Dry-runs an install to preview what packages would be added or changed.
-  Future<WgInstallPlan> simulateInstall(String packageId,
-      {String? catalogId, String? version}) async {
+  Future<WgInstallPlan> simulateInstall(
+    String packageId, {
+    String? catalogId,
+    String? version,
+  }) async {
     final port = ReceivePort();
     try {
       _bridge.simulateInstall(
-          _handle, packageId, catalogId, version, port.sendPort);
+        _handle,
+        packageId,
+        catalogId,
+        version,
+        port.sendPort,
+      );
       final msg = await port.first;
       final decoded = MessageDecoder.decode(msg);
       if (decoded['error'] != null) {
@@ -193,8 +206,12 @@ class WgClient {
   // ---------------------------------------------------------------------------
 
   /// Installs a package, emitting progress events.
-  WgTransaction<void> installPackage(String packageId,
-      {String? catalogId, String? version, bool silent = true}) {
+  WgTransaction<void> installPackage(
+    String packageId, {
+    String? catalogId,
+    String? version,
+    bool silent = true,
+  }) {
     return _progressTransaction(
       (port) =>
           _bridge.install(_handle, packageId, catalogId, version, silent, port),
@@ -202,8 +219,11 @@ class WgClient {
   }
 
   /// Upgrades a package to the latest (or specified) version.
-  WgTransaction<void> upgradePackage(String packageId,
-      {String? version, bool silent = true}) {
+  WgTransaction<void> upgradePackage(
+    String packageId, {
+    String? version,
+    bool silent = true,
+  }) {
     return _progressTransaction(
       (port) => _bridge.upgrade(_handle, packageId, version, silent, port),
     );
@@ -222,9 +242,7 @@ class WgClient {
 
   /// Returns packages that have available upgrades.
   WgTransaction<List<WgPackage>> getUpdates() {
-    return _streamingTransaction(
-      (port) => _bridge.getUpdates(_handle, port),
-    );
+    return _streamingTransaction((port) => _bridge.getUpdates(_handle, port));
   }
 
   // ---------------------------------------------------------------------------
@@ -239,7 +257,8 @@ class WgClient {
   // ---------------------------------------------------------------------------
 
   WgTransaction<List<WgPackage>> _streamingTransaction(
-      void Function(SendPort port) startFn) {
+    void Function(SendPort port) startFn,
+  ) {
     final port = ReceivePort();
     final packages = <WgPackage>[];
     final controller = StreamController<WgPackage>();
@@ -267,11 +286,16 @@ class WgClient {
           } else if (decoded.containsKey('cancelled')) {
             cleanup(const WgCancelledException());
           } else if (decoded['error'] != null) {
-            cleanup(WgException(decoded['error'] as String,
-                hresult: decoded['hresult'] as int?));
+            cleanup(
+              WgException(
+                decoded['error'] as String,
+                hresult: decoded['hresult'] as int?,
+              ),
+            );
           } else if (decoded['pkg'] != null) {
-            final pkg =
-                WgPackage.fromJson(decoded['pkg'] as Map<String, dynamic>);
+            final pkg = WgPackage.fromJson(
+              decoded['pkg'] as Map<String, dynamic>,
+            );
             packages.add(pkg);
             controller.add(pkg);
           }
@@ -291,7 +315,8 @@ class WgClient {
   }
 
   WgTransaction<void> _progressTransaction(
-      void Function(SendPort port) startFn) {
+    void Function(SendPort port) startFn,
+  ) {
     final port = ReceivePort();
     final progressController = StreamController<WgProgress>();
     final completer = Completer<void>();
@@ -318,11 +343,16 @@ class WgClient {
           } else if (decoded.containsKey('cancelled')) {
             cleanup(const WgCancelledException());
           } else if (decoded['error'] != null) {
-            cleanup(WgException(decoded['error'] as String,
-                hresult: decoded['hresult'] as int?));
+            cleanup(
+              WgException(
+                decoded['error'] as String,
+                hresult: decoded['hresult'] as int?,
+              ),
+            );
           } else if (decoded['progress'] != null) {
-            progressController.add(WgProgress.fromJson(
-                decoded['progress'] as Map<String, dynamic>));
+            progressController.add(
+              WgProgress.fromJson(decoded['progress'] as Map<String, dynamic>),
+            );
           }
         } catch (e, st) {
           cleanup(e, st);

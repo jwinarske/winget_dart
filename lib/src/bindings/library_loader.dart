@@ -98,8 +98,9 @@ String? resolveWingetNcPath({
   }
   if (tempBuilds.isNotEmpty) {
     // Pick the most recently modified build.
-    tempBuilds
-        .sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+    tempBuilds.sort(
+      (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+    );
     return tempBuilds.first.path;
   }
 
