@@ -1,3 +1,14 @@
+## 0.4.0
+
+- **Breaking:** migrate the native build hook from `hooks` 1.x to 2.x (and
+  `code_assets` to 1.2.x). hooks 2.x requires **Dart >=3.10**, so the SDK lower
+  bound rises from 3.6.0 — consumers on Dart 3.6–3.9 should stay on 0.3.x. The
+  hook's behaviour is unchanged (it still builds `winget_nc.dll` via CMake and
+  skips cleanly when its prerequisites are absent); the migration is a dependency
+  bump only.
+- Drop the `native_toolchain_c` dependency: it was declared but never imported
+  (the hook drives CMake directly rather than `CBuilder`).
+
 ## 0.3.1
 
 ### Fixes
