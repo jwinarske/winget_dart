@@ -30,7 +30,8 @@ void main(List<String> args) async {
       Architecture.x64 => ('x64', 'x64'),
       Architecture.arm64 => ('ARM64', 'arm64'),
       _ => throw UnsupportedError(
-          'winget_dart does not support architecture: $arch'),
+        'winget_dart does not support architecture: $arch',
+      ),
     };
 
     final nativeDir = input.packageRoot.resolve('native/');
@@ -43,10 +44,12 @@ void main(List<String> args) async {
         .hashCode
         .toUnsigned(32)
         .toRadixString(16);
-    final buildDir = Directory('${Platform.environment['TEMP'] ?? r'C:\Temp'}'
-        r'\wg_nc_'
-        '$outputHash'
-        '_$targetArch');
+    final buildDir = Directory(
+      '${Platform.environment['TEMP'] ?? r'C:\Temp'}'
+      r'\wg_nc_'
+      '$outputHash'
+      '_$targetArch',
+    );
     await buildDir.create(recursive: true);
 
     // Locate the WinGet COM interop DLL from the NuGet package.
@@ -60,7 +63,8 @@ void main(List<String> args) async {
         if (entry is Directory &&
             entry.path.contains('Microsoft.WindowsPackageManager.ComInterop')) {
           final dll = File(
-              '${entry.path}/bin/$archDir/native/static/Microsoft.Management.Deployment.dll');
+            '${entry.path}/bin/$archDir/native/static/Microsoft.Management.Deployment.dll',
+          );
           if (dll.existsSync()) {
             interopDll = dll.path;
             break;
@@ -72,13 +76,15 @@ void main(List<String> args) async {
     if (interopDll == null) {
       final home = Platform.environment['USERPROFILE'] ?? '';
       final cacheBase = Directory(
-          '$home/.nuget/packages/microsoft.windowspackagemanager.cominterop');
+        '$home/.nuget/packages/microsoft.windowspackagemanager.cominterop',
+      );
       if (cacheBase.existsSync()) {
         final versions = cacheBase.listSync()
           ..sort((a, b) => b.path.compareTo(a.path));
         for (final v in versions) {
           final dll = File(
-              '${v.path}/bin/$archDir/native/static/Microsoft.Management.Deployment.dll');
+            '${v.path}/bin/$archDir/native/static/Microsoft.Management.Deployment.dll',
+          );
           if (dll.existsSync()) {
             interopDll = dll.path;
             break;
@@ -92,83 +98,82 @@ void main(List<String> args) async {
         : <String>[];
 
     // Configure CMake with Visual Studio 2022 generator.
-    final configure = await Process.run(
-        'cmake',
-        [
-          nativeDir.toFilePath(),
-          '-G',
-          'Visual Studio 17 2022',
-          '-A',
-          cmakeArch,
-          '-DCMAKE_BUILD_TYPE=Release',
-          '-DTARGET_ARCH=$targetArch',
-          '-DBUILD_TESTING=OFF',
-          '-DCMAKE_INSTALL_PREFIX=${buildDir.path}/install',
-          ...cmakeInteropArg,
-        ],
-        workingDirectory: buildDir.path);
+    final configure = await Process.run('cmake', [
+      nativeDir.toFilePath(),
+      '-G',
+      'Visual Studio 17 2022',
+      '-A',
+      cmakeArch,
+      '-DCMAKE_BUILD_TYPE=Release',
+      '-DTARGET_ARCH=$targetArch',
+      '-DBUILD_TESTING=OFF',
+      '-DCMAKE_INSTALL_PREFIX=${buildDir.path}/install',
+      ...cmakeInteropArg,
+    ], workingDirectory: buildDir.path);
     if (configure.exitCode != 0) {
       stderr.writeln(
-          'winget_dart: cmake configure failed (native bridge unavailable):\n'
-          '${configure.stderr}');
+        'winget_dart: cmake configure failed (native bridge unavailable):\n'
+        '${configure.stderr}',
+      );
       return;
     }
 
     // Build.
-    final buildResult = await Process.run(
-        'cmake',
-        [
-          '--build',
-          '.',
-          '--config',
-          'Release',
-          '--parallel',
-        ],
-        workingDirectory: buildDir.path);
+    final buildResult = await Process.run('cmake', [
+      '--build',
+      '.',
+      '--config',
+      'Release',
+      '--parallel',
+    ], workingDirectory: buildDir.path);
     if (buildResult.exitCode != 0) {
       stderr.writeln(
-          'winget_dart: cmake build failed (native bridge unavailable):\n'
-          '${buildResult.stderr}');
+        'winget_dart: cmake build failed (native bridge unavailable):\n'
+        '${buildResult.stderr}',
+      );
       return;
     }
 
     // Install.
-    final installResult = await Process.run(
-        'cmake',
-        [
-          '--install',
-          '.',
-          '--config',
-          'Release',
-        ],
-        workingDirectory: buildDir.path);
+    final installResult = await Process.run('cmake', [
+      '--install',
+      '.',
+      '--config',
+      'Release',
+    ], workingDirectory: buildDir.path);
     if (installResult.exitCode != 0) {
       stderr.writeln(
-          'winget_dart: cmake install failed (native bridge unavailable):\n'
-          '${installResult.stderr}');
+        'winget_dart: cmake install failed (native bridge unavailable):\n'
+        '${installResult.stderr}',
+      );
       return;
     }
 
     final dll = Uri.file('${buildDir.path}/install/bin/winget_nc.dll');
 
-    output.assets.code.add(CodeAsset(
-      package: 'winget_dart',
-      name: 'src/winget_nc.dart',
-      file: dll,
-      linkMode: DynamicLoadingBundled(),
-    ));
+    output.assets.code.add(
+      CodeAsset(
+        package: 'winget_dart',
+        name: 'src/winget_nc.dart',
+        file: dll,
+        linkMode: DynamicLoadingBundled(),
+      ),
+    );
 
     // Also register the WinGet COM interop DLL as a bundled asset.
     // winget_nc.dll loads it at runtime from its own directory.
     final interopInstalled = File(
-        '${buildDir.path}/install/bin/Microsoft.Management.Deployment.dll');
+      '${buildDir.path}/install/bin/Microsoft.Management.Deployment.dll',
+    );
     if (interopInstalled.existsSync()) {
-      output.assets.code.add(CodeAsset(
-        package: 'winget_dart',
-        name: 'src/winget_interop.dart',
-        file: interopInstalled.uri,
-        linkMode: DynamicLoadingBundled(),
-      ));
+      output.assets.code.add(
+        CodeAsset(
+          package: 'winget_dart',
+          name: 'src/winget_interop.dart',
+          file: interopInstalled.uri,
+          linkMode: DynamicLoadingBundled(),
+        ),
+      );
     }
   });
 }

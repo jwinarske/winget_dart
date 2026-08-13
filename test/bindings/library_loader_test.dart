@@ -48,17 +48,18 @@ void main() {
     });
 
     test('ignores empty WINGET_NC_LIB', () {
-      final result = resolveWingetNcPath(
-        environment: {'WINGET_NC_LIB': ''},
-      );
+      final result = resolveWingetNcPath(environment: {'WINGET_NC_LIB': ''});
       expect(result, isNull);
     });
 
     test('finds DLL in .dart_tool/lib/', () {
       final dartToolLib = p.join(tmpDir.path, '.dart_tool', 'lib');
       placeDll(p.join(dartToolLib, 'winget_nc.dll'));
-      final packageConfig =
-          p.join(tmpDir.path, '.dart_tool', 'package_config.json');
+      final packageConfig = p.join(
+        tmpDir.path,
+        '.dart_tool',
+        'package_config.json',
+      );
       File(packageConfig)
         ..parent.createSync(recursive: true)
         ..writeAsStringSync('{}');
@@ -85,12 +86,26 @@ void main() {
 
     test('picks most recent temp build when multiple exist', () {
       // Create two build dirs with different timestamps.
-      final old = placeDll(p.join(tmpDir.path, 'wg_nc_old11111_arm64',
-          'install', 'bin', 'winget_nc.dll'));
+      final old = placeDll(
+        p.join(
+          tmpDir.path,
+          'wg_nc_old11111_arm64',
+          'install',
+          'bin',
+          'winget_nc.dll',
+        ),
+      );
       // Ensure different mtime.
       sleep(const Duration(milliseconds: 50));
-      final newer = placeDll(p.join(tmpDir.path, 'wg_nc_new22222_arm64',
-          'install', 'bin', 'winget_nc.dll'));
+      final newer = placeDll(
+        p.join(
+          tmpDir.path,
+          'wg_nc_new22222_arm64',
+          'install',
+          'bin',
+          'winget_nc.dll',
+        ),
+      );
 
       final result = resolveWingetNcPath(
         environment: {'TEMP': tmpDir.path},
@@ -101,8 +116,15 @@ void main() {
     });
 
     test('skips temp dirs that do not match hostArch', () {
-      placeDll(p.join(
-          tmpDir.path, 'wg_nc_abc_arm64', 'install', 'bin', 'winget_nc.dll'));
+      placeDll(
+        p.join(
+          tmpDir.path,
+          'wg_nc_abc_arm64',
+          'install',
+          'bin',
+          'winget_nc.dll',
+        ),
+      );
 
       final result = resolveWingetNcPath(
         environment: {'TEMP': tmpDir.path},
@@ -144,8 +166,9 @@ void main() {
     });
 
     test('override takes precedence over env var', () {
-      final overrideDll =
-          placeDll(p.join(tmpDir.path, 'override', 'winget_nc.dll'));
+      final overrideDll = placeDll(
+        p.join(tmpDir.path, 'override', 'winget_nc.dll'),
+      );
       final envDll = placeDll(p.join(tmpDir.path, 'env', 'winget_nc.dll'));
 
       final result = resolveWingetNcPath(
@@ -159,8 +182,11 @@ void main() {
       final envDll = placeDll(p.join(tmpDir.path, 'env', 'winget_nc.dll'));
       final dartToolLib = p.join(tmpDir.path, '.dart_tool', 'lib');
       placeDll(p.join(dartToolLib, 'winget_nc.dll'));
-      final packageConfig =
-          p.join(tmpDir.path, '.dart_tool', 'package_config.json');
+      final packageConfig = p.join(
+        tmpDir.path,
+        '.dart_tool',
+        'package_config.json',
+      );
       File(packageConfig).writeAsStringSync('{}');
 
       final result = resolveWingetNcPath(
@@ -175,8 +201,11 @@ void main() {
     test('finds via packageConfig path', () {
       final dartToolLib = p.join(tmpDir.path, '.dart_tool', 'lib');
       Directory(dartToolLib).createSync(recursive: true);
-      final packageConfig =
-          p.join(tmpDir.path, '.dart_tool', 'package_config.json');
+      final packageConfig = p.join(
+        tmpDir.path,
+        '.dart_tool',
+        'package_config.json',
+      );
       File(packageConfig).writeAsStringSync('{}');
 
       final result = findDartToolLib(packageConfig: packageConfig);
@@ -186,8 +215,11 @@ void main() {
     test('finds via file: URI packageConfig', () {
       final dartToolLib = p.join(tmpDir.path, '.dart_tool', 'lib');
       Directory(dartToolLib).createSync(recursive: true);
-      final packageConfig =
-          p.join(tmpDir.path, '.dart_tool', 'package_config.json');
+      final packageConfig = p.join(
+        tmpDir.path,
+        '.dart_tool',
+        'package_config.json',
+      );
       File(packageConfig).writeAsStringSync('{}');
 
       final result = findDartToolLib(

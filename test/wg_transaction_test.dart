@@ -33,10 +33,7 @@ void main() {
     });
 
     test('result future resolves after packages stream closes', () async {
-      fake.stubSearchName('q', [
-        Msg.pkg(id: 'X', name: 'X'),
-        Msg.done,
-      ]);
+      fake.stubSearchName('q', [Msg.pkg(id: 'X', name: 'X'), Msg.done]);
       final tx = client.searchName('q');
       final result = await tx.result;
       expect(result, hasLength(1));
@@ -56,7 +53,9 @@ void main() {
       }
       final resultItems = await tx.result;
       expect(
-          streamItems.map((p) => p.id), equals(resultItems.map((p) => p.id)));
+        streamItems.map((p) => p.id),
+        equals(resultItems.map((p) => p.id)),
+      );
     });
 
     test('error from bridge propagates to result future', () async {
@@ -105,8 +104,10 @@ void main() {
     });
 
     test('result future resolves after progress stream closes', () async {
-      fake.stubInstall(
-          'Pkg.A', [Msg.progress(100, state: 'finished'), Msg.success]);
+      fake.stubInstall('Pkg.A', [
+        Msg.progress(100, state: 'finished'),
+        Msg.success,
+      ]);
       final tx = client.installPackage('Pkg.A');
       await for (final _ in tx.progress) {}
       await tx.result; // completes without error
@@ -120,10 +121,7 @@ void main() {
     });
 
     test('cancellation propagates as WgCancelledException', () async {
-      fake.stubInstall('Pkg.A', [
-        Msg.progress(25),
-        Msg.cancelled,
-      ]);
+      fake.stubInstall('Pkg.A', [Msg.progress(25), Msg.cancelled]);
       final tx = client.installPackage('Pkg.A');
       unawaited(tx.progress.toList().catchError((_) => <WgProgress>[]));
       expect(tx.result, throwsA(isA<WgCancelledException>()));
@@ -137,9 +135,11 @@ void main() {
       final tx = client.installPackage('Pkg.A');
       unawaited(tx.progress.toList().catchError((_) => <WgProgress>[]));
       expect(
-          tx.result,
-          throwsA(isA<WgException>()
-              .having((e) => e.hresult, 'hresult', -2147024891)));
+        tx.result,
+        throwsA(
+          isA<WgException>().having((e) => e.hresult, 'hresult', -2147024891),
+        ),
+      );
     });
   });
 }

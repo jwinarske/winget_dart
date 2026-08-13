@@ -12,8 +12,11 @@ void main() {
 
   group('WgInstallPlan.fromJson', () {
     test('all lists empty -> isEmpty is true', () {
-      final plan = WgInstallPlan.fromJson(
-          {'installing': [], 'upgrading': [], 'removing': []});
+      final plan = WgInstallPlan.fromJson({
+        'installing': [],
+        'upgrading': [],
+        'removing': [],
+      });
       expect(plan.isEmpty, isTrue);
     });
 

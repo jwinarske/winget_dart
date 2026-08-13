@@ -95,7 +95,9 @@ void main() {
     test('returns package when found', () async {
       final fake = FakeWingetBridge()
         ..stubFindById(
-            'Kitware.CMake', Msg.pkg(id: 'Kitware.CMake', name: 'CMake'));
+          'Kitware.CMake',
+          Msg.pkg(id: 'Kitware.CMake', name: 'CMake'),
+        );
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
@@ -118,10 +120,13 @@ void main() {
     test('returns install plan', () async {
       final fake = FakeWingetBridge()
         ..stubSimulateInstall(
-            'Kitware.CMake',
-            Msg.plan(installing: [
-              {'id': 'Kitware.CMake', 'name': 'CMake', 'version': '3.28.0'}
-            ]));
+          'Kitware.CMake',
+          Msg.plan(
+            installing: [
+              {'id': 'Kitware.CMake', 'name': 'CMake', 'version': '3.28.0'},
+            ],
+          ),
+        );
       final client = await WgClient.connect(fake);
       addTearDown(client.close);
 
@@ -261,10 +266,11 @@ void main() {
       final fake = FakeWingetBridge()
         ..stubGetUpdates([
           Msg.pkg(
-              id: 'Pkg.A',
-              name: 'A',
-              version: '1.0.0',
-              availableVersion: '2.0.0'),
+            id: 'Pkg.A',
+            name: 'A',
+            version: '1.0.0',
+            availableVersion: '2.0.0',
+          ),
           Msg.done,
         ]);
       final client = await WgClient.connect(fake);

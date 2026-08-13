@@ -14,7 +14,8 @@ abstract final class MessageDecoder {
     if (msg is Uint8List) return utf8.decode(msg);
     if (msg is String) return msg;
     throw FormatException(
-        'winget_dart: unexpected message type: ${msg.runtimeType}');
+      'winget_dart: unexpected message type: ${msg.runtimeType}',
+    );
   }
 
   /// Decode a raw message (String or Uint8List) from the bridge into a map.
